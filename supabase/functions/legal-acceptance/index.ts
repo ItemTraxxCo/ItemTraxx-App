@@ -1,7 +1,7 @@
 import { serve } from "../_shared/serve.ts";
 import { getExternalAuthUser } from "../_shared/externalAuth.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.108.2";
-import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
+import { resolveCorsHeaders } from "../_shared/cors.ts";
 import { isAccountTokenBlockedBySessionRevocation } from "../_shared/accountSessions.ts";
 import { isSuperAdminTokenBlockedBySessionRevocation } from "../_shared/superAdminSessions.ts";
 import { getRequestId } from "../_shared/observability.ts";
@@ -21,21 +21,11 @@ const corsHeaders = {
   Vary: "Origin",
 };
 
-const resolveCorsHeaders = (req: Request) => {
-  const origin = req.headers.get("Origin");
-  const allowedOrigins = parseAllowedOrigins(Deno.env.get("ITX_ALLOWED_ORIGINS"));
-  const originAllowed = !origin || isAllowedOrigin(origin, allowedOrigins);
-  const headers = origin && originAllowed
-    ? { ...corsHeaders, "Access-Control-Allow-Origin": origin }
-    : corsHeaders;
-  return { originAllowed, headers };
-};
-
 const parseAuthToken = (req: Request) =>
   req.headers.get("authorization")?.match(/^Bearer\s+(.+)$/iu)?.[1]?.trim() ?? "";
 
 serve(async (req) => {
-  const { originAllowed, headers } = resolveCorsHeaders(req);
+  const { originAllowed, headers } = resolveCorsHeaders(req, corsHeaders);
   const requestId = getRequestId(req);
   const jsonResponse = (status: number, body: Record<string, unknown>) =>
     new Response(JSON.stringify({ ok: status < 400, ...body }), {

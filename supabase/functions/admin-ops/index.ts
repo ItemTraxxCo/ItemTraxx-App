@@ -2,7 +2,7 @@ import { serve } from "../_shared/serve.ts";
 import { getExternalAuthUser } from "../_shared/externalAuth.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.108.2";
 import { isKillSwitchWriteBlocked } from "../_shared/killSwitch.ts";
-import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
+import { resolveCorsHeaders } from "../_shared/cors.ts";
 import { resolveRateLimitResult } from "../_shared/preloginGuards.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 import { readJsonBody } from "../_shared/requestBody.ts";
@@ -42,25 +42,8 @@ const baseCorsHeaders = {
   Vary: "Origin",
 };
 
-const resolveCorsHeaders = (req: Request) => {
-  const origin = req.headers.get("Origin");
-  const allowedOrigins = parseAllowedOrigins(
-    Deno.env.get("ITX_ALLOWED_ORIGINS"),
-  );
-
-  const hasOrigin = !!origin;
-  const originAllowed = !hasOrigin ||
-    (hasOrigin && isAllowedOrigin(origin as string, allowedOrigins));
-
-  const headers = hasOrigin && originAllowed
-    ? { ...baseCorsHeaders, "Access-Control-Allow-Origin": origin as string }
-    : { ...baseCorsHeaders };
-
-  return { hasOrigin, originAllowed, headers };
-};
-
 serve((req) => withRequestSpan(req, "POST /functions/admin-ops", async (span, requestId) => {
-  const { hasOrigin, originAllowed, headers } = resolveCorsHeaders(req);
+  const { hasOrigin, originAllowed, headers } = resolveCorsHeaders(req, baseCorsHeaders);
 
   const jsonResponse = (status: number, body: Record<string, unknown>) =>
     new Response(JSON.stringify(body), {

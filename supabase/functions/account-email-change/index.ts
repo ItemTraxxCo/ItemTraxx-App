@@ -2,7 +2,7 @@ import { serve } from "../_shared/serve.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.108.2";
 import { getExternalAuthUser } from "../_shared/externalAuth.ts";
 import { isKillSwitchWriteBlocked } from "../_shared/killSwitch.ts";
-import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
+import { resolveCorsHeaders } from "../_shared/cors.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 import { readJsonBody } from "../_shared/requestBody.ts";
 import { callBetterAuthAdmin } from "../_shared/betterAuthAdmin.ts";
@@ -48,11 +48,7 @@ const publicError = "This email change could not be completed. Request a new cha
 
 serve(async (req) => {
   const origin = req.headers.get("Origin");
-  const allowedOrigins = parseAllowedOrigins(Deno.env.get("ITX_ALLOWED_ORIGINS"));
-  const originAllowed = !origin || isAllowedOrigin(origin, allowedOrigins);
-  const headers = origin && originAllowed
-    ? { ...BASE_CORS_HEADERS, "Access-Control-Allow-Origin": origin }
-    : BASE_CORS_HEADERS;
+  const { originAllowed, headers } = resolveCorsHeaders(req, BASE_CORS_HEADERS);
   const jsonResponse = (status: number, body: Record<string, unknown>) =>
     new Response(JSON.stringify(body), {
       status,

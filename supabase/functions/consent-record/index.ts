@@ -1,7 +1,7 @@
 import { serve } from "../_shared/serve.ts";
 import { getExternalAuthUser } from "../_shared/externalAuth.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.108.2";
-import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
+import { resolveCorsHeaders } from "../_shared/cors.ts";
 import { readJsonBody } from "../_shared/requestBody.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 import { ValidationError } from "../_shared/validation.ts";
@@ -59,13 +59,7 @@ const jsonResponse = (
 
 serve(async (req) => {
   const origin = req.headers.get("Origin");
-  const allowedOrigins = parseAllowedOrigins(
-    Deno.env.get("ITX_ALLOWED_ORIGINS"),
-  );
-  const originAllowed = !origin || isAllowedOrigin(origin, allowedOrigins);
-  const headers = origin && originAllowed
-    ? { ...corsBase, "Access-Control-Allow-Origin": origin }
-    : corsBase;
+  const { originAllowed, headers } = resolveCorsHeaders(req, corsBase);
 
   if (req.method === "OPTIONS") {
     return originAllowed

@@ -29,6 +29,8 @@ coverage
 
 # Playwright
 playwright-report/
+output/playwright/
+.playwright-cli/
 blob-report/
 test-results/
 artifacts/

@@ -53,11 +53,16 @@ const selectedItem = computed(() => availableItems.value.find(i => i.barcode ===
 const editingRecord = computed(() => items.value.find(i => i.barcode === editingItem.value));
 watch(view, () => { editingItem.value = ''; message.value = ''; });
 function notify(text: string) { message.value = text; window.clearTimeout(messageTimer); messageTimer = window.setTimeout(() => { message.value = ''; }, 4000); }
-function addBorrower() { if (borrowers.value.some(b => b.id === 'BR-2002')) return; borrowers.value.push({ id: 'BR-2002', name: 'silver-otter', access: accessMode.value === 'all' ? 'All' : selectedIds.value.map(id => accounts.find(a => a.id === id)?.auth_email).filter(Boolean).join(', '), archived: false }); notify('Borrower added.'); }
-function addItem() { if (items.value.some(i => i.barcode === 'IT-2002')) return; items.value.push({ barcode: 'IT-2002', name: 'Tablet', serial: 'SN-2002', notes: 'Includes charging cable', borrowerId: '', archived: false }); notify('Item added.'); }
+function addBorrower() {
+  if (borrowers.value.some(b => b.id === 'BR-2002')) { notify('This sample borrower was already added.'); return; }
+  if (accessMode.value !== 'all' && !selectedIds.value.length) { notify('Choose at least one tenant account.'); return; }
+  borrowers.value.push({ id: 'BR-2002', name: 'silver-otter', access: accessMode.value === 'all' ? 'All' : selectedIds.value.map(id => accounts.find(a => a.id === id)?.auth_email).filter(Boolean).join(', '), archived: false });
+  notify('Borrower added.');
+}
+function addItem() { if (items.value.some(i => i.barcode === 'IT-2002')) { notify('This sample item was already added.'); return; } items.value.push({ barcode: 'IT-2002', name: 'Tablet', serial: 'SN-2002', notes: 'Includes charging cable', borrowerId: '', archived: false }); notify('Item added.'); }
 function openItem(item: Item) { editingItem.value = item.barcode; editName.value = item.name; }
 function saveItem() { if (!editingRecord.value) return; editingRecord.value.name = editName.value; editingItem.value = ''; notify('Item updated.'); }
-function archiveItem() { if (!editingRecord.value || editingRecord.value.borrowerId) return; editingRecord.value.archived = true; editingItem.value = ''; notify('Item archived.'); }
+function archiveItem() { if (!editingRecord.value) return; if (editingRecord.value.borrowerId) { notify('Return this item before archiving it.'); return; } editingRecord.value.archived = true; editingItem.value = ''; notify('Item archived.'); }
 function transact() { const item = selectedItem.value, borrower = selectedBorrowerRecord.value; if (!item || !borrower || processing.value) return; processing.value = true; notify('Transaction processing...'); timer = window.setTimeout(() => { const action = item.borrowerId ? 'Return' : 'Checkout'; item.borrowerId = item.borrowerId ? '' : borrower.id; logs.value.unshift({ id: Date.now(), time: new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }), action, borrower: `${borrower.name} (${borrower.id})`, item: `${item.name} (${item.barcode})` }); queuedItem.value = ''; selectedBorrower.value = ''; processing.value = false; notify('Transaction complete.'); }, 1500); }
 onUnmounted(() => { window.clearTimeout(timer); window.clearTimeout(messageTimer); });
 </script>

@@ -8,7 +8,7 @@ import {
   isMissingPrivilegedStepUpTable,
   registerPrivilegedStepUp,
 } from "../_shared/privilegedStepUp.ts";
-import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
+import { resolveCorsHeaders } from "../_shared/cors.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 
 const baseCorsHeaders = {
@@ -18,24 +18,8 @@ const baseCorsHeaders = {
   Vary: "Origin",
 };
 
-const resolveCorsHeaders = (req: Request) => {
-  const origin = req.headers.get("Origin");
-  const allowedOrigins = parseAllowedOrigins(
-    Deno.env.get("ITX_ALLOWED_ORIGINS"),
-  );
-
-  const hasOrigin = !!origin;
-  const originAllowed = !hasOrigin ||
-    isAllowedOrigin(origin as string, allowedOrigins);
-  const headers = hasOrigin && originAllowed
-    ? { ...baseCorsHeaders, "Access-Control-Allow-Origin": origin as string }
-    : { ...baseCorsHeaders };
-
-  return { hasOrigin, originAllowed, headers };
-};
-
 serve(async (req) => {
-  const { hasOrigin, originAllowed, headers } = resolveCorsHeaders(req);
+  const { hasOrigin, originAllowed, headers } = resolveCorsHeaders(req, baseCorsHeaders);
 
   const jsonResponse = (status: number, body: Record<string, unknown>) =>
     new Response(JSON.stringify({ ok: status < 400, ...body }), {

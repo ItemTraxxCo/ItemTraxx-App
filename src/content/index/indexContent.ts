@@ -142,8 +142,31 @@ export const getIndexEntries = () =>
 export const getIndexEntry = (slug: string) =>
   entries.find((entry) => entry.slug === slug && isPublished(entry)) ?? null;
 
-export const renderIndexMarkdown = (markdown: string) =>
-  DOMPurify.sanitize(marked.parse(markdown, { async: false }));
+export const renderIndexMarkdown = (markdown: string) => {
+  const sanitizedHtml = DOMPurify.sanitize(marked.parse(markdown, { async: false }));
+  const container = document.createElement("div");
+  container.innerHTML = sanitizedHtml;
+
+  for (const link of container.querySelectorAll<HTMLAnchorElement>("a[href]")) {
+    const href = link.getAttribute("href");
+    if (!href) continue;
+
+    try {
+      const destination = new URL(href, window.location.origin);
+      if (
+        (destination.protocol === "http:" || destination.protocol === "https:") &&
+        destination.origin !== window.location.origin
+      ) {
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+      }
+    } catch {
+      // Leave URLs the browser cannot parse without new-tab behavior.
+    }
+  }
+
+  return container.innerHTML;
+};
 
 export const formatIndexDate = (date: string) => {
   if (!date) return "Date to be added";

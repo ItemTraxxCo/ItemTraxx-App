@@ -54,10 +54,11 @@ const makeSignedIngressRequest = async (input: {
   const method = input.method ?? "POST";
   const body = input.body ?? "{}";
   const signatureBody = input.signedBody ?? body;
+  const signedBodyHash = method === "GET" || method === "HEAD"
+    ? "no-body"
+    : await bodyHash(signatureBody);
   const signature = await sign(
-    `${timestamp}.${requestId}.${method.toUpperCase()}.${target}.${await bodyHash(
-      signatureBody,
-    )}`,
+    `${timestamp}.${requestId}.${method.toUpperCase()}.${target}.${signedBodyHash}`,
   );
 
   return new Request(`https://example.test/functions/${target}`, {
@@ -66,6 +67,7 @@ const makeSignedIngressRequest = async (input: {
       "x-itx-edge-proxy": "1",
       "x-itx-edge-proxy-ts": timestamp,
       "x-itx-edge-proxy-signature": signature,
+      "x-itx-edge-proxy-body-sha256": signedBodyHash,
       "x-request-id": requestId,
       "content-type": "application/json",
     },
@@ -147,8 +149,9 @@ Deno.test("trusted ingress accepts a fresh matching proxy signature", async () =
       access_code: "tenant-1",
       password: "secret",
     });
+    const payloadHash = await bodyHash(payload);
     const signature = await sign(
-      `${timestamp}.${requestId}.POST.${target}.${await bodyHash(payload)}`,
+      `${timestamp}.${requestId}.POST.${target}.${payloadHash}`,
     );
     const request = new Request(
       "https://example.test/functions/workspace-login",
@@ -158,6 +161,7 @@ Deno.test("trusted ingress accepts a fresh matching proxy signature", async () =
           "x-itx-edge-proxy": "1",
           "x-itx-edge-proxy-ts": timestamp,
           "x-itx-edge-proxy-signature": signature,
+          "x-itx-edge-proxy-body-sha256": payloadHash,
           "x-request-id": requestId,
           "content-type": "application/json",
         },
@@ -191,6 +195,7 @@ Deno.test("the audit writer rejects signatures the function proxy issues for bro
         headers: {
           "x-itx-edge-proxy": "1",
           "x-itx-edge-proxy-ts": timestamp,
+          "x-itx-edge-proxy-body-sha256": await bodyHash(payload),
           "x-itx-edge-proxy-signature": await sign(
             `${timestamp}.${requestId}.POST.${signedTarget}.${await bodyHash(
               payload,
@@ -256,6 +261,36 @@ Deno.test("trusted ingress rejects missing, stale, malformed, and body-tampered 
       signedBody: '{"action":"get_workspace_settings"}',
     });
     await assertIngressDenied(bodyTamperedRequest, "tampered request body");
+  });
+});
+
+Deno.test("trusted ingress rejects invalid digests before reading the request body", async () => {
+  await withSecret(async () => {
+    let bodyPulls = 0;
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        bodyPulls += 1;
+        controller.enqueue(new Uint8Array([1]));
+        controller.close();
+      },
+    }, { highWaterMark: 0 });
+    const request = new Request(
+      "https://example.test/functions/contact-support-submit",
+      {
+        method: "POST",
+        headers: {
+          "x-itx-edge-proxy": "1",
+          "x-itx-edge-proxy-ts": Date.now().toString(),
+          "x-itx-edge-proxy-signature": "0".repeat(64),
+          "x-itx-edge-proxy-body-sha256": "0".repeat(64),
+          "x-request-id": "request-invalid-signature",
+        },
+        body,
+      },
+    );
+
+    await assertIngressDenied(request, "invalid body-digest signature");
+    assert(bodyPulls === 0, "unauthenticated bodies must not be read or hashed");
   });
 });
 
@@ -403,8 +438,9 @@ Deno.test("trusted ingress preserves the support attachment payload limit", asyn
     const timestamp = Date.now().toString();
     const requestId = "request-support-large";
     const target = "contact-support-submit";
+    const payloadHash = await bodyHash(payload);
     const signature = await sign(
-      `${timestamp}.${requestId}.POST.${target}.${await bodyHash(payload)}`,
+      `${timestamp}.${requestId}.POST.${target}.${payloadHash}`,
     );
     const request = new Request(
       "https://example.test/functions/contact-support-submit",
@@ -414,6 +450,7 @@ Deno.test("trusted ingress preserves the support attachment payload limit", asyn
           "x-itx-edge-proxy": "1",
           "x-itx-edge-proxy-ts": timestamp,
           "x-itx-edge-proxy-signature": signature,
+          "x-itx-edge-proxy-body-sha256": payloadHash,
           "x-request-id": requestId,
           "content-type": "application/json",
         },
@@ -445,10 +482,9 @@ Deno.test("trusted ingress rejects body replay with modified payload", async () 
       access_code: "tenant-1",
       password: "changed",
     });
+    const originalPayloadHash = await bodyHash(originalPayload);
     const signature = await sign(
-      `${timestamp}.${requestId}.POST.${target}.${await bodyHash(
-        originalPayload,
-      )}`,
+      `${timestamp}.${requestId}.POST.${target}.${originalPayloadHash}`,
     );
     const request = new Request(
       "https://example.test/functions/workspace-login",
@@ -458,6 +494,7 @@ Deno.test("trusted ingress rejects body replay with modified payload", async () 
           "x-itx-edge-proxy": "1",
           "x-itx-edge-proxy-ts": timestamp,
           "x-itx-edge-proxy-signature": signature,
+          "x-itx-edge-proxy-body-sha256": originalPayloadHash,
           "x-request-id": requestId,
           "content-type": "application/json",
         },
@@ -593,8 +630,9 @@ Deno.test("trusted ingress rejects a timestamp outside the allowed clock skew", 
     const target = "workspace-login";
     const requestId = "request-skew";
     const staleTimestamp = (Date.now() - 5 * 60 * 1000).toString();
+    const payloadHash = await bodyHash("{}");
     const signature = await sign(
-      `${staleTimestamp}.${requestId}.POST.${target}.${await bodyHash("{}")}`,
+      `${staleTimestamp}.${requestId}.POST.${target}.${payloadHash}`,
     );
     const request = new Request(
       "https://example.test/functions/workspace-login",
@@ -604,6 +642,7 @@ Deno.test("trusted ingress rejects a timestamp outside the allowed clock skew", 
           "x-itx-edge-proxy": "1",
           "x-itx-edge-proxy-ts": staleTimestamp,
           "x-itx-edge-proxy-signature": signature,
+          "x-itx-edge-proxy-body-sha256": payloadHash,
           "x-request-id": requestId,
         },
         body: "{}",
@@ -620,8 +659,9 @@ Deno.test("trusted ingress rejects requests missing an x-request-id header", asy
   await withSecret(async () => {
     const target = "workspace-login";
     const timestamp = Date.now().toString();
+    const payloadHash = await bodyHash("{}");
     const signature = await sign(
-      `${timestamp}..POST.${target}.${await bodyHash("{}")}`,
+      `${timestamp}..POST.${target}.${payloadHash}`,
     );
     const request = new Request(
       "https://example.test/functions/workspace-login",
@@ -631,6 +671,7 @@ Deno.test("trusted ingress rejects requests missing an x-request-id header", asy
           "x-itx-edge-proxy": "1",
           "x-itx-edge-proxy-ts": timestamp,
           "x-itx-edge-proxy-signature": signature,
+          "x-itx-edge-proxy-body-sha256": payloadHash,
         },
         body: "{}",
       },
@@ -658,6 +699,7 @@ Deno.test("trusted ingress accepts GET requests using the no-body hash", async (
           "x-itx-edge-proxy": "1",
           "x-itx-edge-proxy-ts": timestamp,
           "x-itx-edge-proxy-signature": signature,
+          "x-itx-edge-proxy-body-sha256": "no-body",
           "x-request-id": requestId,
         },
       },
@@ -675,6 +717,7 @@ Deno.test("requireTrustedEdgeIngress surfaces oversized-body validation errors w
     const timestamp = Date.now().toString();
     const requestId = "request-oversized";
     const oversizedPayload = "x".repeat(1024 * 1024 + 100);
+    const payloadHash = await bodyHash(oversizedPayload);
     const request = new Request(
       "https://example.test/functions/generic-target",
       {
@@ -682,8 +725,10 @@ Deno.test("requireTrustedEdgeIngress surfaces oversized-body validation errors w
         headers: {
           "x-itx-edge-proxy": "1",
           "x-itx-edge-proxy-ts": timestamp,
-          "x-itx-edge-proxy-signature":
-            "irrelevant-because-body-check-runs-first",
+          "x-itx-edge-proxy-signature": await sign(
+            `${timestamp}.${requestId}.POST.${target}.${payloadHash}`,
+          ),
+          "x-itx-edge-proxy-body-sha256": payloadHash,
           "x-request-id": requestId,
         },
         body: oversizedPayload,

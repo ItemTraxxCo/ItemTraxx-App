@@ -1,4 +1,5 @@
 import {
+  EDGE_PROXY_BODY_HASH_HEADER,
   EDGE_PROXY_HEADER,
   EDGE_PROXY_SIGNATURE_HEADER,
   EDGE_PROXY_TIMESTAMP_HEADER,
@@ -49,6 +50,7 @@ export const applyTrustedIngressHeaders = async (
   const bodyHash = await hashTrustedIngressBody(body);
   headers.set(EDGE_PROXY_HEADER, "1");
   headers.set(EDGE_PROXY_TIMESTAMP_HEADER, timestamp);
+  headers.set(EDGE_PROXY_BODY_HASH_HEADER, bodyHash);
   headers.set(
     EDGE_PROXY_SIGNATURE_HEADER,
     await signTrustedIngress(

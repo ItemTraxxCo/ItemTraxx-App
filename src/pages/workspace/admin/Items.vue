@@ -50,6 +50,7 @@
           Notes
           <textarea
             v-model="notes"
+            data-session-replay-mask
             rows="3"
             placeholder="Optional notes"
             maxlength="500"
@@ -250,11 +251,12 @@
             v-if="isModalEditing"
             v-model="editNotes"
             class="item-notes-input"
+            data-session-replay-mask
             rows="3"
             maxlength="500"
             placeholder="Notes"
           ></textarea>
-          <div v-else class="item-notes-readonly">{{ selectedItem.notes || "-" }}</div>
+          <div v-else class="item-notes-readonly" data-session-replay-mask>{{ selectedItem.notes || "-" }}</div>
           <div v-if="isModalEditing" class="muted form-help-row">
             <span>Character limit 500</span>
             <span>{{ editNotes.length }}/500</span>

@@ -1,3 +1,9 @@
+import {
+  MAX_PROXY_REQUEST_BODY_BYTES,
+  readBoundedRequestBody,
+  RequestBodyLimitError,
+} from "./requestBody.ts";
+
 const BETTER_AUTH_CAPTCHA_PATHS = new Set([
   "/api/auth/sign-in/email",
   "/api/auth/request-password-reset",
@@ -15,7 +21,33 @@ export const normalizeBetterAuthPathname = (pathname: string) => {
  * non-safelisted x-captcha-response header); promote it back to the header only
  * inside the Worker, immediately before Better Auth's captcha middleware runs.
  */
-export const normalizeBetterAuthCaptchaRequest = async (request: Request) => {
+export const normalizeBetterAuthCaptchaRequest = async (
+  request: Request,
+): Promise<Request | Response> => {
+  // This helper runs immediately before Better Auth's handler. Bound every
+  // auth request here, before either this function or Better Auth parses it.
+  if (request.body) {
+    try {
+      const body = await readBoundedRequestBody(
+        request,
+        MAX_PROXY_REQUEST_BODY_BYTES,
+      );
+      const headers = new Headers(request.headers);
+      headers.delete("content-length");
+      const bodyBuffer = new ArrayBuffer(body.byteLength);
+      new Uint8Array(bodyBuffer).set(body);
+      request = new Request(request, { headers, body: bodyBuffer });
+    } catch (error) {
+      if (error instanceof RequestBodyLimitError) {
+        return Response.json(
+          { message: error.message },
+          { status: error.status },
+        );
+      }
+      throw error;
+    }
+  }
+
   const url = new URL(request.url);
   if (
     request.method !== "POST" ||

@@ -1,6 +1,8 @@
 import { serve } from "../_shared/serve.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.108.2";
 import { getExternalAuthUser } from "../_shared/externalAuth.ts";
+import { isAccountTokenBlockedBySessionRevocation } from "../_shared/accountSessions.ts";
+import { isSuperAdminTokenBlockedBySessionRevocation } from "../_shared/superAdminSessions.ts";
 import { isKillSwitchWriteBlocked } from "../_shared/killSwitch.ts";
 import { resolveCorsHeaders } from "../_shared/cors.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
@@ -116,6 +118,40 @@ serve(async (req) => {
         error: authError,
       } = await getExternalAuthUser(userClient, authorization);
       if (authError || !user?.id) return jsonResponse(401, { error: "Unauthorized" });
+
+      const { data: profile, error: profileError } = await adminClient
+        .from("profiles")
+        .select("id, role, workspace_id, is_active, deleted_at")
+        .eq("id", user.id)
+        .maybeSingle();
+      if (profileError) return jsonResponse(503, { error: "Account status unavailable." });
+      if (!profile || profile.is_active !== true || profile.deleted_at) {
+        return jsonResponse(403, { error: "Account access denied." });
+      }
+      if (profile.role !== "super_admin" && !profile.workspace_id) {
+        return jsonResponse(403, { error: "Account access denied." });
+      }
+
+      const accessToken = authorization.replace(/^Bearer\s+/i, "").trim();
+      let revocation;
+      try {
+        revocation = profile.role === "super_admin"
+          ? await isSuperAdminTokenBlockedBySessionRevocation(adminClient, {
+            profileId: user.id,
+            authToken: accessToken,
+          })
+          : await isAccountTokenBlockedBySessionRevocation(adminClient, {
+            workspaceId: profile.workspace_id,
+            profileId: user.id,
+            authToken: accessToken,
+          });
+      } catch {
+        return jsonResponse(503, { error: "Session controls unavailable." });
+      }
+      if (revocation.relationMissing) {
+        return jsonResponse(503, { error: "Session controls unavailable." });
+      }
+      if (revocation.blocked) return jsonResponse(401, { error: "Session revoked." });
 
       const newEmail = requireEmail(body.new_email);
       const approvalToken = randomToken();

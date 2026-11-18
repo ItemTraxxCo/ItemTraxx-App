@@ -122,7 +122,7 @@ describe("initPostHog", () => {
     expect(posthogMock.init).toHaveBeenCalledWith(
       "tok_123",
       expect.objectContaining({
-        capture_exceptions: true,
+        capture_exceptions: false,
         capture_pageview: false,
         capture_pageleave: false,
         persistence: "memory",
@@ -158,14 +158,14 @@ describe("initPostHog", () => {
     expect(posthogMock.init).toHaveBeenCalledWith(
       "tok_123",
       expect.objectContaining({
-        capture_exceptions: true,
+        capture_exceptions: false,
         autocapture: false,
-        capture_pageleave: true,
+        capture_pageleave: false,
         cross_subdomain_cookie: true,
         cookieWinsOnConflict: true,
         save_referrer: false,
         logs: expect.objectContaining({ captureConsoleLogs: false }),
-        disable_session_recording: false,
+        disable_session_recording: true,
         session_recording: expect.objectContaining({
           maskAllInputs: true,
           maskTextSelector: "[data-session-replay-mask]",
@@ -432,9 +432,88 @@ describe("identifyPostHogUser", () => {
   });
 });
 
+describe("PostHog auth identity lifecycle", () => {
+  it("resets persisted identity before applying the queued authenticated user", async () => {
+    vi.stubEnv("VITE_POSTHOG_PROJECT_TOKEN", "tok_123");
+    mockedAllows.mockReturnValue(true);
+    mockedDiagnostics.mockReturnValue(true);
+    const mod = await loadFreshModule();
+    const { setPostHogIdentity } = await import("./posthogIdentityLifecycle");
+    setPostHogIdentity("current-user", "tenant_account");
+
+    await mod.initPostHog();
+    mod.syncPostHogConsent();
+
+    expect(posthogMock.reset).toHaveBeenCalledOnce();
+    expect(posthogMock.identify).toHaveBeenCalledWith("current-user", { role: "tenant_account" });
+    expect(posthogMock.capture).toHaveBeenCalledWith("$pageview", expect.any(Object));
+  });
+
+  it("holds telemetry until the asynchronously loaded SDK has the current identity", async () => {
+    vi.stubEnv("VITE_POSTHOG_PROJECT_TOKEN", "tok_123");
+    mockedAllows.mockReturnValue(true);
+    mockedDiagnostics.mockReturnValue(true);
+    const mod = await loadFreshModule();
+    const { setPostHogIdentity } = await import("./posthogIdentityLifecycle");
+    setPostHogIdentity("current-user", "tenant_account");
+    let loaded: (() => void) | undefined;
+    posthogMock.init.mockImplementationOnce((_token, options) => { loaded = options.loaded; });
+
+    await mod.initPostHog();
+    mod.syncPostHogConsent();
+    mod.capturePostHogEvent("must_wait");
+    expect(posthogMock.reset).not.toHaveBeenCalled();
+    expect(posthogMock.capture).not.toHaveBeenCalled();
+
+    loaded?.();
+
+    expect(posthogMock.reset).toHaveBeenCalledOnce();
+    expect(posthogMock.identify).toHaveBeenCalledWith("current-user", { role: "tenant_account" });
+    expect(posthogMock.capture).toHaveBeenCalledWith("$pageview", expect.any(Object));
+    expect(posthogMock.reset.mock.invocationCallOrder[0]).toBeLessThan(posthogMock.identify.mock.invocationCallOrder[0]!);
+    expect(posthogMock.identify.mock.invocationCallOrder[0]).toBeLessThan(posthogMock.capture.mock.invocationCallOrder[0]!);
+  });
+
+  it("stops telemetry if the persisted identity reset fails", async () => {
+    vi.stubEnv("VITE_POSTHOG_PROJECT_TOKEN", "tok_123");
+    mockedAllows.mockReturnValue(true);
+    mockedDiagnostics.mockReturnValue(true);
+    const mod = await loadFreshModule();
+    const { setPostHogIdentity, resetPostHogIdentity } = await import("./posthogIdentityLifecycle");
+    setPostHogIdentity("current-user", "tenant_account");
+    posthogMock.reset.mockImplementationOnce(() => { throw new Error("reset failed"); });
+
+    await mod.initPostHog();
+    mod.syncPostHogConsent();
+    mod.capturePostHogEvent("must_not_leak");
+
+    expect(posthogMock.identify).not.toHaveBeenCalled();
+    expect(posthogMock.capture).not.toHaveBeenCalled();
+
+    resetPostHogIdentity();
+    expect(posthogMock.reset).toHaveBeenCalledTimes(2);
+  });
+
+  it("resets between authenticated users and on sign-out", async () => {
+    await initializedModule();
+    posthogMock.reset.mockClear();
+    posthogMock.identify.mockClear();
+    const { setPostHogIdentity, resetPostHogIdentity } = await import("./posthogIdentityLifecycle");
+
+    setPostHogIdentity("user-a", "tenant_account");
+    setPostHogIdentity("user-b", "individual_account");
+    resetPostHogIdentity();
+
+    expect(posthogMock.reset).toHaveBeenCalledTimes(2);
+    expect(posthogMock.identify).toHaveBeenNthCalledWith(1, "user-a", { role: "tenant_account" });
+    expect(posthogMock.identify).toHaveBeenNthCalledWith(2, "user-b", { role: "individual_account" });
+  });
+});
+
 describe("resetPostHog", () => {
   it("calls posthog.reset() once initialized", async () => {
     const mod = await initializedModule();
+    posthogMock.reset.mockClear();
 
     mod.resetPostHog();
 

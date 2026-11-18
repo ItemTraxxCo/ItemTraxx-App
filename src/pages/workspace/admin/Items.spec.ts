@@ -86,4 +86,23 @@ describe("workspace item management table", () => {
     expect(rowCells).not.toContain("All");
     wrapper.unmount();
   });
+
+  it("masks free-form notes in the item details modal", async () => {
+    const wrapper = mount(Items, {
+      global: {
+        stubs: {
+          CameraBarcodeScannerModal: true,
+          RouterLink: { template: "<a><slot /></a>" },
+          SkeletonLoader: true,
+          TenantAccessPicker: true,
+        },
+      },
+    });
+    await flushPromises();
+
+    const itemRow = wrapper.find("table.table tbody tr");
+    await itemRow.find("button.link").trigger("click");
+    expect(wrapper.find(".item-notes-readonly").attributes("data-session-replay-mask")).toBe("");
+    wrapper.unmount();
+  });
 });

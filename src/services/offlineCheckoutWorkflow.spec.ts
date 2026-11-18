@@ -349,6 +349,46 @@ describe("getOfflineWorkflowSummary", () => {
     expect(summary.reviewCount).toBe(1);
     expect(summary.packExpired).toBe(false);
   });
+
+  it("excludes stale ledger counts from other profiles, workspaces, and devices", async () => {
+    setAuthStateFromBackend({ isAuthenticated: true, userId: PROFILE_ID, workspaceContextId: WORKSPACE_ID });
+    await writeOfflinePack(makePack());
+    await writeOfflineLedger([
+      makeLedgerEntry({ id: "current", status: "pending" }),
+      makeLedgerEntry({ id: "other-profile", profile_id: "profile-2", status: "syncing" }),
+      makeLedgerEntry({ id: "other-workspace", workspace_id: "ws-2", status: "needs_review" }),
+      makeLedgerEntry({ id: "other-device", device_id: "device-2", status: "needs_review" }),
+    ]);
+
+    const summary = await getOfflineWorkflowSummary();
+    expect(summary.pendingCount).toBe(1);
+    expect(summary.syncingCount).toBe(0);
+    expect(summary.reviewCount).toBe(0);
+  });
+
+  it("hides foreign ledger counts without an authenticated scope or matching pack", async () => {
+    await writeOfflineLedger([
+      makeLedgerEntry({ id: "other-profile", profile_id: "profile-2", status: "pending" }),
+      makeLedgerEntry({ id: "other-workspace", workspace_id: "ws-2", status: "needs_review" }),
+    ]);
+
+    const unauthenticatedSummary = await getOfflineWorkflowSummary();
+    expect(unauthenticatedSummary).toMatchObject({
+      pack: null,
+      pendingCount: 0,
+      syncingCount: 0,
+      reviewCount: 0,
+    });
+
+    setAuthStateFromBackend({ isAuthenticated: true, userId: PROFILE_ID, workspaceContextId: WORKSPACE_ID });
+    const scopedSummary = await getOfflineWorkflowSummary();
+    expect(scopedSummary).toMatchObject({
+      pack: null,
+      pendingCount: 0,
+      syncingCount: 0,
+      reviewCount: 0,
+    });
+  });
 });
 
 describe("listOfflineReviewEntries", () => {

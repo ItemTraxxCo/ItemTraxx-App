@@ -56,6 +56,11 @@ Deno.test("trusted-ingress headers sign the exact timestamp, request, method, ta
       "timestamp header",
     );
     assertEquals(
+      headers.get("x-itx-edge-proxy-body-sha256"),
+      "60f760a777617df09478ebf025b5cddc22c387ed8599c420042374296e6cdc2c",
+      "body digest header",
+    );
+    assertEquals(
       headers.get("x-itx-edge-proxy-signature"),
       "441f86e3a8877e9abd4e742b6b9ab375bd40766e3a4c990ca102310a04a7fbfe",
       "signature header",
@@ -79,6 +84,11 @@ Deno.test("trusted-ingress headers remain absent without a nonblank secret", asy
     assertEquals(headers.get("existing"), "kept", "existing header");
     assertEquals(headers.get("x-itx-edge-proxy"), null, "trusted marker");
     assertEquals(headers.get("x-itx-edge-proxy-ts"), null, "timestamp header");
+    assertEquals(
+      headers.get("x-itx-edge-proxy-body-sha256"),
+      null,
+      "body digest header",
+    );
     assertEquals(
       headers.get("x-itx-edge-proxy-signature"),
       null,

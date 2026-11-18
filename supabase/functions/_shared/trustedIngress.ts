@@ -3,6 +3,7 @@ import { readBoundedBodyBytes } from "./requestBody.ts";
 const EDGE_PROXY_HEADER = "x-itx-edge-proxy";
 const EDGE_PROXY_TIMESTAMP_HEADER = "x-itx-edge-proxy-ts";
 const EDGE_PROXY_SIGNATURE_HEADER = "x-itx-edge-proxy-signature";
+const EDGE_PROXY_BODY_HASH_HEADER = "x-itx-edge-proxy-body-sha256";
 const MAX_CLOCK_SKEW_MS = 30 * 1000;
 const TRUSTED_INGRESS_REPLAY_TTL_MS = 60 * 1000;
 const TRUSTED_INGRESS_REPLAY_SWEEP_INTERVAL_MS = 10 * 1000;
@@ -106,9 +107,11 @@ const claimTrustedIngressRequest = async (
 };
 
 type VerifiedTrustedIngress = {
+  bodyHash: string;
   requestId: string;
   signature: string;
   target: string;
+  timestampMs: number;
   verifiedAt: number;
 };
 
@@ -188,35 +191,60 @@ const verifyTrustedEdgeIngress = async (
   if (!requestId) {
     return null;
   }
-  const bodyHash = await hashRequestBody(req, target);
+  const bodyHash = req.headers.get(EDGE_PROXY_BODY_HASH_HEADER)?.trim() ?? "";
+  if (
+    !(bodyHash === "no-body" || /^[0-9a-f]{64}$/.test(bodyHash)) ||
+    ((req.method === "GET" || req.method === "HEAD") !==
+      (bodyHash === "no-body"))
+  ) {
+    return null;
+  }
   const expected = await sign(
     secret,
     `${timestamp}.${requestId}.${req.method.toUpperCase()}.${target}.${bodyHash}`,
   );
   if (!timingSafeEqual(signature, expected)) return null;
 
-  // Recheck after body hashing and signature verification so a request that
-  // aged out while being verified cannot claim a replay slot.
+  // Recheck after signature verification so a request that aged out while
+  // being verified cannot claim a replay slot.
   const verifiedAt = Date.now();
   if (Math.abs(verifiedAt - timestampMs) > MAX_CLOCK_SKEW_MS) return null;
 
-  return { requestId, signature, target, verifiedAt };
+  return { bodyHash, requestId, signature, target, timestampMs, verifiedAt };
+};
+
+const claimAndVerifyTrustedIngressBody = async (
+  req: Request,
+  verified: VerifiedTrustedIngress,
+): Promise<ReplayClaim | "body-mismatch" | "expired"> => {
+  const actualBodyHash = await hashRequestBody(req, verified.target);
+  if (!timingSafeEqual(actualBodyHash, verified.bodyHash)) {
+    return "body-mismatch";
+  }
+  if (Math.abs(Date.now() - verified.timestampMs) > MAX_CLOCK_SKEW_MS) {
+    return "expired";
+  }
+
+  const claim = await claimTrustedIngressRequest(
+    verified.requestId,
+    verified.signature,
+    verified.verifiedAt,
+  );
+  return claim;
 };
 
 export const hasTrustedEdgeIngress = async (req: Request, target: string) => {
   const verified = await verifyTrustedEdgeIngress(req, target);
   if (verified === null) return false;
 
-  // Callers use this boolean as a trusted-path gate, so it must consume a
-  // valid envelope too; otherwise a replay could remain trusted on that path.
-  const claim = await claimTrustedIngressRequest(
-    verified.requestId,
-    verified.signature,
-    verified.verifiedAt,
-  );
+  // Authenticate the small signed digest before reading the body, so invalid
+  // direct calls cannot trigger full-body hashing.
+  const claim = await claimAndVerifyTrustedIngressBody(req, verified);
   if (claim === "claimed") return true;
 
-  logReplayClaimFailure(claim, verified);
+  if (claim !== "body-mismatch" && claim !== "expired") {
+    logReplayClaimFailure(claim, verified);
+  }
   return false;
 };
 
@@ -235,23 +263,6 @@ const logReplayClaimFailure = (
   );
 };
 
-const trustedIngressReplayResponse = async (
-  verified: VerifiedTrustedIngress,
-  jsonResponse: (status: number, body: Record<string, unknown>) => Response,
-) => {
-  const claim = await claimTrustedIngressRequest(
-    verified.requestId,
-    verified.signature,
-    verified.verifiedAt,
-  );
-  if (claim === "claimed") return null;
-
-  logReplayClaimFailure(claim, verified);
-  return claim === "replay"
-    ? jsonResponse(409, { error: "Trusted edge request replay detected." })
-    : jsonResponse(503, { error: "Trusted edge replay protection unavailable." });
-};
-
 export const requireTrustedEdgeIngress = async (
   req: Request,
   target: string,
@@ -262,7 +273,16 @@ export const requireTrustedEdgeIngress = async (
     if (verified === null) {
       return jsonResponse(403, { error: "Trusted edge ingress required." });
     }
-    return await trustedIngressReplayResponse(verified, jsonResponse);
+    const claim = await claimAndVerifyTrustedIngressBody(req, verified);
+    if (claim === "claimed") return null;
+    if (claim === "body-mismatch" || claim === "expired") {
+      return jsonResponse(403, { error: "Trusted edge ingress required." });
+    }
+
+    logReplayClaimFailure(claim, verified);
+    return claim === "replay"
+      ? jsonResponse(409, { error: "Trusted edge request replay detected." })
+      : jsonResponse(503, { error: "Trusted edge replay protection unavailable." });
   } catch (error) {
     if (
       error instanceof Error &&

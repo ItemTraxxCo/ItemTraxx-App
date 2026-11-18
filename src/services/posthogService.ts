@@ -14,12 +14,21 @@ import {
   SESSION_REPLAY_MASK_SELECTOR,
 } from "./sessionReplayPrivacy";
 import { clearReplaySessionHandoff } from "./sessionReplayHandoff";
+import {
+  subscribePostHogIdentity,
+  type PostHogIdentityAction,
+} from "./posthogIdentityLifecycle";
 
 let initialized = false;
 let posthogReady = false;
 let posthog: typeof import("posthog-js").default | null = null;
 let initializationPromise: Promise<void> | null = null;
 let posthogReadyPromise: Promise<void> | null = null;
+let pendingConsentSync = false;
+let posthogIdentitySafe = false;
+let initialPageviewCaptured = false;
+let latestIdentityAction: PostHogIdentityAction = { type: "reset" };
+let lastAppliedIdentityAction: PostHogIdentityAction = { type: "reset" };
 const SERVICE_NAME = "itemtraxx-web";
 const APP_ENVIRONMENT = import.meta.env.VITE_POSTHOG_ENVIRONMENT?.trim() || import.meta.env.MODE || "production";
 const APP_VERSION = import.meta.env.VITE_GIT_COMMIT?.trim() || "n/a";
@@ -345,6 +354,8 @@ export const capturePostHogLog = (input: PostHogLogInput) => {
   if (
     isLocalhostRuntime() ||
     !initialized ||
+    !posthogReady ||
+    !posthogIdentitySafe ||
     !posthog ||
     !allowsDiagnostics(readCookieConsent())
   ) return;
@@ -566,7 +577,6 @@ const initializePostHog = async () => {
     const currentConsent = readCookieConsent();
     const currentAnalyticsAllowed = allowsAnalytics(currentConsent);
     const currentDiagnosticsAllowed = allowsDiagnostics(currentConsent);
-    const currentSessionReplayAllowed = allowsSessionReplay(currentConsent);
     if (!currentAnalyticsAllowed && !currentDiagnosticsAllowed) {
       clearReplaySessionHandoff();
       return;
@@ -602,12 +612,14 @@ const initializePostHog = async () => {
       cookieWinsOnConflict: true,
       autocapture: false,
       rageclick: false,
-      capture_pageview: currentAnalyticsAllowed ? "history_change" : false,
-      capture_pageleave: currentAnalyticsAllowed,
+      // Defer all pageviews until the persisted identity has been reset and
+      // the current authenticated user, if any, has been applied.
+      capture_pageview: false,
+      capture_pageleave: false,
       capture_dead_clicks: false,
       // Exception autocapture is diagnostics, not analytics. Keep the SDK's
       // global handlers disabled unless that separate consent is present.
-      capture_exceptions: allowsDiagnostics(currentConsent) && !isLocalhostRuntime(),
+      capture_exceptions: false,
       before_send: (event) => {
         if (!event) return null;
         if (event.event === "$exception" && isLocalhostRuntime()) return null;
@@ -666,7 +678,7 @@ const initializePostHog = async () => {
       // Replay requires both Analytics and Diagnostics consent. Keep input
       // values masked, but redact only explicitly marked borrower/user data so
       // the rest of the page stays useful in the replay viewer.
-      disable_session_recording: !currentSessionReplayAllowed,
+      disable_session_recording: true,
       session_recording: {
         maskAllInputs: true,
         maskTextSelector: SESSION_REPLAY_MASK_SELECTOR,
@@ -706,10 +718,20 @@ const initializePostHog = async () => {
         // before the SDK's first pageview is captured.
         posthog?.unregister("$initial_person_info");
         initialized = true;
+        resetPostHog();
         posthogReady = true;
+        lastAppliedIdentityAction = { type: "reset" };
+        if (posthogIdentitySafe && latestIdentityAction.type === "identify") {
+          identifyPostHogUser(
+            latestIdentityAction.distinctId,
+            latestIdentityAction.role ? { role: latestIdentityAction.role } : undefined,
+          );
+          lastAppliedIdentityAction = latestIdentityAction;
+        }
         resolvePostHogReady?.();
         resolvePostHogReady = null;
         posthogReadyPromise = null;
+        flushPendingPostHogConsent();
       },
     });
     initialized = true;
@@ -733,15 +755,19 @@ export const initPostHog = async () => {
 };
 
 const waitForPostHogReady = async () => {
-  if (posthogReady) return true;
+  if (posthogReady) return posthogIdentitySafe;
   if (initializationPromise) await initializationPromise;
-  if (posthogReady) return true;
+  if (posthogReady) return posthogIdentitySafe;
   if (posthogReadyPromise) await posthogReadyPromise;
-  return posthogReady;
+  return posthogReady && posthogIdentitySafe;
 };
 
 export const syncPostHogConsent = () => {
   if (!initialized || !posthog) return;
+  if (!posthogReady || !posthogIdentitySafe) {
+    pendingConsentSync = true;
+    return;
+  }
   try {
     const consent = readCookieConsent();
     const analyticsAllowed = allowsAnalytics(consent);
@@ -757,6 +783,10 @@ export const syncPostHogConsent = () => {
     if (!sessionReplayAllowed) clearReplaySessionHandoff();
     if (analyticsAllowed) {
       posthog.opt_in_capturing();
+      if (!initialPageviewCaptured && typeof window !== "undefined") {
+        posthog.capture("$pageview", { $current_url: window.location.href });
+        initialPageviewCaptured = true;
+      }
       if (sessionReplayAllowed) {
         posthog.startSessionRecording();
       } else {
@@ -786,7 +816,7 @@ export const capturePostHogEvent = (
   event: string,
   properties?: Record<string, string | number | boolean | null | undefined>
 ) => {
-  if (!initialized || !posthog || !allowsAnalytics(readCookieConsent())) return;
+  if (!initialized || !posthogReady || !posthogIdentitySafe || !posthog || !allowsAnalytics(readCookieConsent())) return;
   try {
     posthog.capture(event, scrubProperties(properties));
   } catch (error) {
@@ -798,7 +828,7 @@ export const identifyPostHogUser = (
   distinctId: string,
   properties?: Record<string, string | number | boolean | null | undefined>
 ) => {
-  if (!initialized || !posthog || !allowsAnalytics(readCookieConsent())) return;
+  if (!initialized || !posthogReady || !posthogIdentitySafe || !posthog || !allowsAnalytics(readCookieConsent())) return;
   try {
     const safeProperties = scrubProperties(properties);
     if (EMAIL_PATTERN.test(distinctId)) {
@@ -812,13 +842,61 @@ export const identifyPostHogUser = (
 
 export const resetPostHog = () => {
   clearReplaySessionHandoff();
-  if (!initialized || !posthog) return;
+  if (!initialized || !posthog) {
+    posthogIdentitySafe = false;
+    return false;
+  }
   try {
     posthog.reset();
+    posthogIdentitySafe = true;
+    return true;
   } catch (error) {
+    posthogIdentitySafe = false;
     console.warn("[posthog] reset failed; continuing without analytics.", error);
+    return false;
   }
 };
+
+const flushPendingPostHogConsent = () => {
+  if (!pendingConsentSync || !posthogReady || !posthogIdentitySafe) return;
+  pendingConsentSync = false;
+  syncPostHogConsent();
+};
+
+const applyPostHogIdentityAction = (action: PostHogIdentityAction) => {
+  latestIdentityAction = action;
+  if (!initialized || !posthogReady || !posthog) return;
+
+  if (action.type === "reset") {
+    resetPostHog();
+    lastAppliedIdentityAction = action;
+    flushPendingPostHogConsent();
+    return;
+  }
+
+  if (
+    lastAppliedIdentityAction.type === "identify" &&
+    lastAppliedIdentityAction.distinctId !== action.distinctId
+  ) {
+    if (!resetPostHog()) return;
+  } else if (!posthogIdentitySafe && !resetPostHog()) {
+    return;
+  }
+  if (
+    lastAppliedIdentityAction.type !== "identify" ||
+    lastAppliedIdentityAction.distinctId !== action.distinctId ||
+    lastAppliedIdentityAction.role !== action.role
+  ) {
+    identifyPostHogUser(
+      action.distinctId,
+      action.role ? { role: action.role } : undefined,
+    );
+  }
+  lastAppliedIdentityAction = action;
+  flushPendingPostHogConsent();
+};
+
+subscribePostHogIdentity(applyPostHogIdentityAction);
 
 // A missing borrower/item lookup is an expected operator input outcome, not an
 // exception. Other operational failures still belong in PostHog for diagnosis.
@@ -829,6 +907,8 @@ export const capturePostHogException = (
   if (
     isLocalhostRuntime() ||
     !initialized ||
+    !posthogReady ||
+    !posthogIdentitySafe ||
     !posthog ||
     !allowsDiagnostics(readCookieConsent()) ||
     isCspUnsafeEvalError(error) ||

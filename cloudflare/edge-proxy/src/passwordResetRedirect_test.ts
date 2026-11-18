@@ -207,6 +207,44 @@ Deno.test("unrelated Better Auth requests are unchanged", async () => {
   assertStrictEquals(normalized, request);
 });
 
+Deno.test("public reset requests reject oversized declared bodies before parsing", async () => {
+  const request = new Request(
+    "https://edge.itemtraxx.com/api/auth/request-password-reset",
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "content-length": String(64 * 1024 + 1),
+      },
+      body: "{}",
+    },
+  );
+
+  const result = await normalizeBetterAuthPasswordResetRequest(request, productionEnv);
+  if (!(result instanceof Response)) throw new Error("Expected a response");
+  assertEquals(result.status, 413);
+});
+
+Deno.test("public reset requests stop oversized streamed bodies at the byte cap", async () => {
+  const request = new Request(
+    "https://edge.itemtraxx.com/api/auth/request-password-reset",
+    {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(new Uint8Array(64 * 1024 + 1));
+          controller.close();
+        },
+      }),
+    },
+  );
+
+  const result = await normalizeBetterAuthPasswordResetRequest(request, productionEnv);
+  if (!(result instanceof Response)) throw new Error("Expected a response");
+  assertEquals(result.status, 413);
+});
+
 Deno.test("public reset requests reject unsupported content types", async () => {
   const request = new Request(
     "https://edge.itemtraxx.com/api/auth/request-password-reset",

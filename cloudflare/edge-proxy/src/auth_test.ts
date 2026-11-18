@@ -739,7 +739,7 @@ Deno.test("promotes a form captcha field to Better Auth's header", async () => {
   assertEquals(await normalized.text(), "email=user%40example.com&password=correct-horse");
 });
 
-Deno.test("leaves requests without a form captcha unchanged", async () => {
+Deno.test("preserves a form sign-in request without a captcha field", async () => {
   const request = new Request("https://edge.itemtraxx.com/api/auth/sign-in/email", {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
@@ -748,8 +748,45 @@ Deno.test("leaves requests without a form captcha unchanged", async () => {
 
   const normalized = await normalizeBetterAuthCaptchaRequest(request);
 
-  assertEquals(normalized, request);
+  if (normalized instanceof Response) throw new Error("Expected a bounded request");
+  assertEquals(normalized.headers.get("content-type"), "application/x-www-form-urlencoded");
   assertEquals(await normalized.text(), "email=user%40example.com&password=correct-horse");
+});
+
+Deno.test("rejects oversized declared public Better Auth request bodies", async () => {
+  const request = new Request("https://edge.itemtraxx.com/api/auth/sign-in/email", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "content-length": String(1024 * 1024 + 1),
+    },
+    body: "{}",
+  });
+
+  const response = await handleBetterAuthRequest(request, {} as Env);
+
+  assertEquals(response.status, 413);
+});
+
+Deno.test("rejects oversized streamed public Better Auth request bodies", async () => {
+  const request = new Request("https://edge.itemtraxx.com/api/auth/sign-in/email", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "content-length": "1",
+    },
+    body: new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new Uint8Array(1024 * 1024 + 1));
+        controller.close();
+      },
+    }),
+  });
+
+  const response = await normalizeBetterAuthCaptchaRequest(request);
+
+  if (!(response instanceof Response)) throw new Error("Expected an oversized-body response");
+  assertEquals(response.status, 413);
 });
 
 Deno.test("promotes a form captcha field on password reset requests", async () => {

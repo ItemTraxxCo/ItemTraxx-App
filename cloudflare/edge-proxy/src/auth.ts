@@ -1555,9 +1555,11 @@ export const handleBetterAuthRequest = async (request: Request, rawEnv: Env) => 
     env,
   );
   if (normalizedResetRequest instanceof Response) return normalizedResetRequest;
-  return getBetterAuth(env).handler(
-    await normalizeBetterAuthCaptchaRequest(normalizedResetRequest),
+  const normalizedCaptchaRequest = await normalizeBetterAuthCaptchaRequest(
+    normalizedResetRequest,
   );
+  if (normalizedCaptchaRequest instanceof Response) return normalizedCaptchaRequest;
+  return getBetterAuth(env).handler(normalizedCaptchaRequest);
 };
 
 export const getSupabaseAccessToken = async (request: Request, env: Env) => {

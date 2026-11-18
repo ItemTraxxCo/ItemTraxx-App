@@ -3,6 +3,7 @@ export const RATE_LIMIT_RETRY_AFTER_SECONDS = 60;
 export const EDGE_PROXY_HEADER = "x-itx-edge-proxy";
 export const EDGE_PROXY_TIMESTAMP_HEADER = "x-itx-edge-proxy-ts";
 export const EDGE_PROXY_SIGNATURE_HEADER = "x-itx-edge-proxy-signature";
+export const EDGE_PROXY_BODY_HASH_HEADER = "x-itx-edge-proxy-body-sha256";
 
 export const DEFAULT_KILL_SWITCH_MESSAGE =
   "Unfortunately ItemTraxx is currently unavailable. We apologize for any inconvenience and are working to restore access as soon as possible. Please see the status page (https://status.itemtraxx.com/) for more information.";

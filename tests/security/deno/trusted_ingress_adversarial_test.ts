@@ -52,10 +52,11 @@ const makeSignedIngressRequest = async (input: {
   const method = input.method ?? "POST";
   const body = input.body ?? "{}";
   const signatureBody = input.signedBody ?? body;
+  const signedBodyHash = method === "GET" || method === "HEAD"
+    ? "no-body"
+    : await bodyHash(signatureBody);
   const signature = await sign(
-    `${timestamp}.${requestId}.${method.toUpperCase()}.${target}.${await bodyHash(
-      signatureBody,
-    )}`,
+    `${timestamp}.${requestId}.${method.toUpperCase()}.${target}.${signedBodyHash}`,
   );
 
   return new Request(`https://example.test/functions/${target}`, {
@@ -64,6 +65,7 @@ const makeSignedIngressRequest = async (input: {
       "x-itx-edge-proxy": "1",
       "x-itx-edge-proxy-ts": timestamp,
       "x-itx-edge-proxy-signature": signature,
+      "x-itx-edge-proxy-body-sha256": signedBodyHash,
       "x-request-id": requestId,
       "content-type": "application/json",
     },

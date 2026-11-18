@@ -1,5 +1,6 @@
 import { normalizeBetterAuthPathname } from "./authCaptcha.ts";
 import { isItemTraxxHostname, trimTrailingSlash } from "./url.ts";
+import { readBoundedRequestBody, RequestBodyLimitError } from "./requestBody.ts";
 
 export const CANONICAL_PASSWORD_RESET_URL =
   "https://www.itemtraxx.com/reset-password";
@@ -83,8 +84,28 @@ const resolvePublicPasswordResetRedirect = (
   }
 };
 
+const MAX_PASSWORD_RESET_REQUEST_BODY_BYTES = 64 * 1024;
+
 const badRequest = () =>
   Response.json({ message: "Invalid password reset request" }, { status: 400 });
+
+const readPasswordResetRequestBody = async (request: Request) => {
+  try {
+    const bytes = await readBoundedRequestBody(
+      request,
+      MAX_PASSWORD_RESET_REQUEST_BODY_BYTES,
+    );
+    return new TextDecoder().decode(bytes);
+  } catch (error) {
+    if (error instanceof RequestBodyLimitError) {
+      return Response.json(
+        { message: "Invalid password reset request" },
+        { status: error.status },
+      );
+    }
+    return badRequest();
+  }
+};
 
 const unsupportedContentType = () =>
   Response.json(
@@ -135,7 +156,9 @@ export const normalizeBetterAuthPasswordResetRequest = async (
     .split(";", 1)[0] ?? "").trim().toLowerCase();
 
   if (contentType === "application/x-www-form-urlencoded") {
-    const body = new URLSearchParams(await request.clone().text());
+    const rawBody = await readPasswordResetRequestBody(request);
+    if (rawBody instanceof Response) return rawBody;
+    const body = new URLSearchParams(rawBody);
     body.set(
       "redirectTo",
       resolvePublicPasswordResetRedirect(env, body.get("redirectTo")),
@@ -144,9 +167,11 @@ export const normalizeBetterAuthPasswordResetRequest = async (
   }
 
   if (contentType === "application/json" || contentType?.endsWith("+json")) {
+    const rawBody = await readPasswordResetRequestBody(request);
+    if (rawBody instanceof Response) return rawBody;
     let body: unknown;
     try {
-      body = await request.clone().json();
+      body = JSON.parse(rawBody);
     } catch {
       return badRequest();
     }

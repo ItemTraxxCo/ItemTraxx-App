@@ -25,6 +25,7 @@
     "npm:fake-indexeddb@^6.2.8": "6.2.8",
     "npm:jose@6.1.3": "6.1.3",
     "npm:jose@6.2.17": "6.2.17",
+    "npm:js-yaml@4.3.2": "4.3.2",
     "npm:jsbarcode@^3.12.3": "3.12.3",
     "npm:jsdom@31": "31.0.0_@noble+hashes@2.4.0",
     "npm:jspdf-autotable@^5.0.9": "5.0.9_jspdf@4.2.1",
@@ -1322,6 +1323,9 @@
     "anynum@1.0.1": {
       "integrity": "sha512-N6//FLET/tXYNM/F6ABca1oH6fWB+KlTt909Le28WMDBk8oaT4vY17DCrwg2MvmuqUKt3Ni4N5dGJ/EoBgcO6A=="
     },
+    "argparse@2.0.1": {
+      "integrity": "sha512-8+9WqebbFzpX9OR+Wa6O29asIogeRMzcGtAINdpMHHyAg10f05aSFVBbcEqGf/PXw1EjAZ+q2/bEBg3DvurK3Q=="
+    },
     "asn1js@3.1.0": {
       "integrity": "sha512-HWYi1THkOqguCiO+vwj09ZkQFD2kKEsejYHAYCtX0D80WVdoDnvRc9IukXX/jeb0T9NRWJnRtqwdbHltnFjwXA==",
       "dependencies": [
@@ -1717,6 +1721,13 @@
     },
     "js-tokens@10.0.0": {
       "integrity": "sha512-lM/UBzQmfJRo9ABXbPWemivdCW8V2G8FHaHdypQaIy523snUjog0W71ayWXTjiR+ixeMyVHN2XcpnTd/liPg/Q=="
+    },
+    "js-yaml@4.3.2": {
+      "integrity": "sha512-SFNOvSJ+Dgf/9An904Yx+CgSlIPCkIpao4qo51lpee25TIRejdH3rhR4EZMGoNx3/TP3O+wzWuiTFl4sqbltzA==",
+      "dependencies": [
+        "argparse"
+      ],
+      "bin": true
     },
     "jsbarcode@3.12.3": {
       "integrity": "sha512-CuHU9hC6dPsHF5oVFMo8NW76uQVjH4L22CsP4hW+dNnGywJHC/B0ThA1CTDVLnxKLrrpYdicBLnd2xsgTfRnvg=="
@@ -2640,6 +2651,7 @@
         "npm:dompurify@3.4.17",
         "npm:fake-indexeddb@^6.2.8",
         "npm:jose@6.2.17",
+        "npm:js-yaml@4.3.2",
         "npm:jsbarcode@^3.12.3",
         "npm:jsdom@31",
         "npm:jspdf-autotable@^5.0.9",

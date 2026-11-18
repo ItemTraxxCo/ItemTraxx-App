@@ -72,12 +72,15 @@ const success = ref(false);
 const themeMode = ref<"light" | "dark">(document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark");
 let themeObserver: MutationObserver | null = null;
 
-const hasRecoveryLinkContext = () => {
-  const queryParams = new URLSearchParams(window.location.search);
-  return Boolean(queryParams.get("token"));
-};
-
-const recoveryToken = () => new URLSearchParams(window.location.search).get("token") ?? "";
+// Capture the one-time token in memory, then remove every query/hash value from
+// the reset URL before the user enters a password or an API request can fail.
+const resetToken = ref(new URLSearchParams(window.location.search).get("token") ?? "");
+try {
+  const scrubbed = scrubSensitiveRecoveryUrl();
+  if (resetToken.value && !scrubbed) resetToken.value = "";
+} catch {
+  resetToken.value = "";
+}
 
 const passwordPolicyMessage =
   "Password must be at least 12 characters and include lowercase, uppercase, a number, and a symbol.";
@@ -111,16 +114,7 @@ const showBlockedState = computed(
 );
 
 const checkRecoverySession = async () => {
-  const recoveryLinkContext = hasRecoveryLinkContext();
-  if (!recoveryLinkContext) {
-    scrubSensitiveRecoveryUrl();
-    isReady.value = false;
-    return;
-  }
-
-  try {
-    isReady.value = Boolean(recoveryToken());
-  } catch { isReady.value = false; }
+  isReady.value = Boolean(resetToken.value);
 };
 
 const handleReset = async () => {
@@ -142,14 +136,14 @@ const handleReset = async () => {
   try {
     const { error: updateError } = await authClient.resetPassword({
       newPassword: newPassword.value,
-      token: recoveryToken(),
+      token: resetToken.value,
     });
     if (updateError) {
       error.value = passwordUpdateErrorMessage(updateError);
       return;
     }
     success.value = true;
-    scrubSensitiveRecoveryUrl();
+    resetToken.value = "";
   } finally {
     isLoading.value = false;
   }

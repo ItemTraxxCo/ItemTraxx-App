@@ -1,4 +1,11 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("../services/posthogIdentityLifecycle", () => ({
+  resetPostHogIdentity: vi.fn(),
+  setPostHogIdentity: vi.fn(),
+}));
+
+import { resetPostHogIdentity, setPostHogIdentity } from "../services/posthogIdentityLifecycle";
 import {
   clearAdminVerification,
   clearAuthState,
@@ -17,6 +24,16 @@ afterEach(() => {
 });
 
 describe("setAuthStateFromBackend", () => {
+  it("synchronizes the analytics identity only for authenticated users", () => {
+    vi.clearAllMocks();
+    setAuthStateFromBackend({ isAuthenticated: true, userId: "u1", role: "tenant_account" });
+
+    expect(setPostHogIdentity).toHaveBeenCalledWith("u1", "tenant_account");
+
+    clearAuthState();
+    expect(resetPostHogIdentity).toHaveBeenCalled();
+  });
+
   it("derives role-based booleans from the role field", () => {
     setAuthStateFromBackend({ role: "workspace_admin", userId: "u1" });
     const state = getAuthState();

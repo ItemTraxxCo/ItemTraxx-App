@@ -71,6 +71,9 @@ const coverageCases = [
     snippets: [
       'class="item-notes-cell" data-session-replay-mask',
       'class="scoped-accounts-cell" data-session-replay-mask',
+      'class="item-notes-readonly" data-session-replay-mask',
+      'v-model="editNotes"\n            class="item-notes-input"\n            data-session-replay-mask',
+      'v-model="notes"\n            data-session-replay-mask',
     ],
   },
   {

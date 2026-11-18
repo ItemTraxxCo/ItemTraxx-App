@@ -1,4 +1,8 @@
 import { reactive } from "vue";
+import {
+  resetPostHogIdentity,
+  setPostHogIdentity,
+} from "../services/posthogIdentityLifecycle";
 
 type UserRole = "tenant_account" | "individual_account" | "workspace_admin" | "super_admin";
 
@@ -73,6 +77,14 @@ const defaultState: AuthState = {
 
 const authState = reactive<AuthState>({ ...defaultState });
 
+const syncPostHogIdentity = () => {
+  if (authState.isAuthenticated && authState.userId) {
+    setPostHogIdentity(authState.userId, authState.role ?? undefined);
+    return;
+  }
+  resetPostHogIdentity();
+};
+
 export const getAuthState = (): AuthState => authState;
 
 type AuthStateBackendPatch = Partial<
@@ -95,6 +107,11 @@ export const setAuthStateFromBackend = (next: AuthStateBackendPatch) => {
     authState.isAdmin = next.role === "workspace_admin" || next.role === "individual_account";
     authState.isWorkspaceAdmin = next.role === "workspace_admin";
     authState.isSuperAdmin = next.role === "super_admin";
+  }
+  if (["isAuthenticated", "userId", "role"].some((key) =>
+    Object.prototype.hasOwnProperty.call(next, key)
+  )) {
+    syncPostHogIdentity();
   }
 };
 
@@ -134,4 +151,5 @@ export const clearAuthState = (markInitialized = false) => {
     ...defaultState,
     isInitialized: markInitialized ? true : defaultState.isInitialized,
   });
+  resetPostHogIdentity();
 };

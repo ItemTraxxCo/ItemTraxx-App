@@ -985,7 +985,13 @@ export const getOfflineWorkflowSummary = async () => {
     ? { workspaceId: auth.workspaceContextId, profileId: auth.userId, deviceId }
     : null;
   const pack = scope ? await readOfflinePack(scope, { allowExpired: true }) : null;
-  const ledger = await readOfflineLedger();
+  const ledger = scope
+    ? (await readOfflineLedger()).filter((entry) =>
+      entry.workspace_id === scope.workspaceId &&
+      entry.profile_id === scope.profileId &&
+      entry.device_id === scope.deviceId
+    )
+    : [];
   return {
     pack,
     packExpired: !!pack && Date.parse(pack.expires_at) <= Date.now(),

@@ -839,6 +839,74 @@ Deno.test("revoke_session succeeds", async () => {
   assertEquals(await responseBody(response!), { data: { revoked: true } });
 });
 
+Deno.test("revoke_session deletes the matching Better Auth session and audits it", async () => {
+  await withMockedBetterAuthFetch(
+    (_url, init) => {
+      assertEquals(JSON.parse(String(init?.body)), {
+        action: "revoke_sessions_by_id",
+        profileId: "00000000-0000-4000-8000-000000000001",
+        sessionIds: ["auth-session-2"],
+      });
+      return betterAuthAdminResponse({ revoked: 1 });
+    },
+    async () => {
+      const { client } = makeAdminClient(
+        sequence([{ data: [{ id: "session-1", auth_session_id: "auth-session-2" }], error: null }]),
+      );
+      const auditCalls: unknown[][] = [];
+      const response = await handleSecuritySessionsAction(
+        contextFor("revoke_session", { session_id: "session-1" }, client, {
+          writeAudit: async (...args) => {
+            auditCalls.push(args);
+          },
+        }),
+      );
+
+      assert(response !== null, "expected a response");
+      assertEquals(response!.status, 200);
+      assertEquals(await responseBody(response!), { data: { revoked: true } });
+      assertEquals(auditCalls, [[
+        "super_admin_session_revoked",
+        "super_admin_auth",
+        "00000000-0000-4000-8000-000000000001",
+        {
+          session_id: "session-1",
+          better_auth_sessions_requested: 1,
+          better_auth_sessions_revoked: 1,
+          better_auth_revocation_ok: true,
+        },
+      ]]);
+    },
+  );
+});
+
+Deno.test("revoke_session reports and audits a failed Better Auth revocation", async () => {
+  await withMockedBetterAuthFetch(
+    () => betterAuthAdminResponse({ error: "Request failed" }, 500),
+    async () => {
+      const { client } = makeAdminClient(
+        sequence([{ data: [{ id: "session-1", auth_session_id: "auth-session-2" }], error: null }]),
+      );
+      const auditCalls: unknown[][] = [];
+      const response = await handleSecuritySessionsAction(
+        contextFor("revoke_session", { session_id: "session-1" }, client, {
+          writeAudit: async (...args) => {
+            auditCalls.push(args);
+          },
+        }),
+      );
+
+      assert(response !== null, "expected a response");
+      assertEquals(response!.status, 503);
+      assertEquals(await responseBody(response!), {
+        error: "Unable to sign out the revoked session.",
+      });
+      assertEquals(auditCalls.length, 1);
+      assertEquals((auditCalls[0][3] as Record<string, unknown>).better_auth_revocation_ok, false);
+    },
+  );
+});
+
 // =====================================================================
 // revoke_all_sessions
 // =====================================================================
@@ -897,6 +965,56 @@ Deno.test("revoke_all_sessions signs out every device including the current one 
   assert(
     !calls.some((call) => call.operations.some((op) => op.method === "neq")),
     "expected no device exclusion when signing out every device",
+  );
+});
+
+Deno.test("revoke_all_sessions deletes each revoked Better Auth session once", async () => {
+  await withMockedBetterAuthFetch(
+    (_url, init) => {
+      assertEquals(JSON.parse(String(init?.body)), {
+        action: "revoke_sessions_by_id",
+        profileId: "00000000-0000-4000-8000-000000000001",
+        sessionIds: ["auth-session-2", "auth-session-3"],
+      });
+      return betterAuthAdminResponse({ revoked: 2 });
+    },
+    async () => {
+      const { client } = makeAdminClient(
+        sequence([{
+          data: [
+            { id: "session-2", auth_session_id: "auth-session-2" },
+            { id: "session-3", auth_session_id: "auth-session-2" },
+            { id: "session-4", auth_session_id: "auth-session-3" },
+            { id: "session-5", auth_session_id: null },
+          ],
+          error: null,
+        }]),
+      );
+      const auditCalls: unknown[][] = [];
+      const response = await handleSecuritySessionsAction(
+        contextFor("revoke_all_sessions", { device_id: "device-1" }, client, {
+          writeAudit: async (...args) => {
+            auditCalls.push(args);
+          },
+        }),
+      );
+
+      assert(response !== null, "expected a response");
+      assertEquals(response!.status, 200);
+      assertEquals(await responseBody(response!), { data: { revoked: 4 } });
+      assertEquals(auditCalls, [[
+        "super_admin_sessions_revoked",
+        "super_admin_auth",
+        "00000000-0000-4000-8000-000000000001",
+        {
+          revoked: 4,
+          sign_out_current: false,
+          better_auth_sessions_requested: 2,
+          better_auth_sessions_revoked: 2,
+          better_auth_revocation_ok: true,
+        },
+      ]]);
+    },
   );
 });
 

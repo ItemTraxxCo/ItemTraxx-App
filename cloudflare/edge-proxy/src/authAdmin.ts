@@ -30,6 +30,26 @@ export type InternalAuthAdminTarget = {
   email: string;
 };
 
+export const MAX_INTERNAL_AUTH_SESSION_IDS = 100;
+
+/**
+ * Validates the Better Auth session ids for a targeted revocation. Returns
+ * null unless the value is a bounded, non-empty list of session ids, so a
+ * malformed payload can never widen into a revoke-everything request.
+ */
+export const parseInternalAuthSessionIds = (value: unknown) => {
+  if (
+    !Array.isArray(value) || value.length === 0 ||
+    value.length > MAX_INTERNAL_AUTH_SESSION_IDS
+  ) return null;
+  if (
+    !value.every((id) =>
+      typeof id === "string" && id.length > 0 && id.length <= 128
+    )
+  ) return null;
+  return [...new Set(value as string[])];
+};
+
 const normalizeEmail = (value: unknown) =>
   typeof value === "string" ? value.trim().toLowerCase() : "";
 

@@ -2,7 +2,11 @@ import {
   assertEquals,
   assertRejects,
 } from "https://deno.land/std@0.224.0/assert/mod.ts";
-import { resolveInternalAuthAdminTarget } from "./authAdmin.ts";
+import {
+  MAX_INTERNAL_AUTH_SESSION_IDS,
+  parseInternalAuthSessionIds,
+  resolveInternalAuthAdminTarget,
+} from "./authAdmin.ts";
 
 type Row = Record<string, any>;
 
@@ -287,4 +291,23 @@ Deno.test("does not create or link accounts for unrelated internal actions", asy
   });
   assertEquals(await resolve(client, "profile-4", "verify_password"), null);
   assertEquals(client.rpcCalls, []);
+});
+
+Deno.test("targeted session revocation accepts only a bounded list of session ids", () => {
+  assertEquals(parseInternalAuthSessionIds(["session-1", "session-2", "session-1"]), [
+    "session-1",
+    "session-2",
+  ]);
+  assertEquals(parseInternalAuthSessionIds(undefined), null);
+  assertEquals(parseInternalAuthSessionIds("session-1"), null);
+  assertEquals(parseInternalAuthSessionIds([]), null);
+  assertEquals(parseInternalAuthSessionIds(["session-1", ""]), null);
+  assertEquals(parseInternalAuthSessionIds(["session-1", 42]), null);
+  assertEquals(parseInternalAuthSessionIds(["x".repeat(129)]), null);
+  assertEquals(
+    parseInternalAuthSessionIds(
+      Array.from({ length: MAX_INTERNAL_AUTH_SESSION_IDS + 1 }, (_, i) => `session-${i}`),
+    ),
+    null,
+  );
 });

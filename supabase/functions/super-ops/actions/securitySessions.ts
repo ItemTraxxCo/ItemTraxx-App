@@ -46,6 +46,40 @@ const resolveAuthSessionId = async (
     : null;
 };
 
+const BETTER_AUTH_SESSION_BATCH_SIZE = 100;
+
+// The super_admin_sessions overlay only blocks super-ops. Delete the matching
+// Better Auth sessions as well so the revoked token cannot refresh elsewhere.
+const revokeBetterAuthSessions = async (
+  profileId: string,
+  rows: Array<Record<string, unknown>>,
+) => {
+  const sessionIds = [
+    ...new Set(
+      rows.map((row) => row.auth_session_id).filter((id): id is string =>
+        typeof id === "string" && id.length > 0
+      ),
+    ),
+  ];
+  let revoked = 0;
+  try {
+    for (let i = 0; i < sessionIds.length; i += BETTER_AUTH_SESSION_BATCH_SIZE) {
+      const result = await callBetterAuthAdmin<{ revoked: number }>({
+        action: "revoke_sessions_by_id",
+        profileId,
+        sessionIds: sessionIds.slice(i, i + BETTER_AUTH_SESSION_BATCH_SIZE),
+      });
+      revoked += typeof result.revoked === "number" ? result.revoked : 0;
+    }
+    return { ok: true as const, requested: sessionIds.length, revoked };
+  } catch (error) {
+    console.error("Unable to revoke super-admin Better Auth sessions", {
+      message: error instanceof Error ? error.message : "Unknown error",
+    });
+    return { ok: false as const, requested: sessionIds.length, revoked };
+  }
+};
+
 const resolveJwtLoginMethod = (claims: Record<string, unknown>) => {
   const amr = claims.amr;
   if (!Array.isArray(amr)) return null;
@@ -437,7 +471,7 @@ export const handleSecuritySessionsAction = async (
       .eq("id", sessionId)
       .eq("profile_id", user.id)
       .is("revoked_at", null)
-      .select("id");
+      .select("id, auth_session_id");
     if (error && isMissingRelation(error, "super_admin_sessions")) {
       return jsonResponse(400, {
         error: "Session controls unavailable. Run latest SQL setup.",
@@ -448,6 +482,21 @@ export const handleSecuritySessionsAction = async (
     }
     if (!data?.length) {
       return jsonResponse(404, { error: "Session not found." });
+    }
+    const betterAuth = await revokeBetterAuthSessions(user.id, data);
+    await writeAudit(
+      "super_admin_session_revoked",
+      "super_admin_auth",
+      user.id,
+      {
+        session_id: sessionId,
+        better_auth_sessions_requested: betterAuth.requested,
+        better_auth_sessions_revoked: betterAuth.revoked,
+        better_auth_revocation_ok: betterAuth.ok,
+      },
+    );
+    if (!betterAuth.ok) {
+      return jsonResponse(503, { error: "Unable to sign out the revoked session." });
     }
     return jsonResponse(200, { data: { revoked: true } });
   }
@@ -475,7 +524,10 @@ export const handleSecuritySessionsAction = async (
         query = query.neq("device_id", currentDeviceId);
       }
     }
-    let { data, error } = await query.select("id");
+    let { data, error } = await query.select("id, auth_session_id") as {
+      data: Array<Record<string, unknown>> | null;
+      error: { code?: string; message?: string } | null;
+    };
     if (
       error && currentAuthSessionId && currentDeviceId &&
       isMissingColumn(error, "auth_session_id")
@@ -494,7 +546,24 @@ export const handleSecuritySessionsAction = async (
     if (error) {
       return jsonResponse(400, { error: "Unable to revoke sessions." });
     }
-    return jsonResponse(200, { data: { revoked: (data ?? []).length } });
+    const rows = data ?? [];
+    const betterAuth = await revokeBetterAuthSessions(user.id, rows);
+    await writeAudit(
+      "super_admin_sessions_revoked",
+      "super_admin_auth",
+      user.id,
+      {
+        revoked: rows.length,
+        sign_out_current: signOutCurrent,
+        better_auth_sessions_requested: betterAuth.requested,
+        better_auth_sessions_revoked: betterAuth.revoked,
+        better_auth_revocation_ok: betterAuth.ok,
+      },
+    );
+    if (!betterAuth.ok) {
+      return jsonResponse(503, { error: "Unable to sign out the revoked sessions." });
+    }
+    return jsonResponse(200, { data: { revoked: rows.length } });
   }
 
   return null;

@@ -42,6 +42,15 @@
       ]
     },
     {
+      "source": "/(super-admin|super-auth|tenant)(/.*)?",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
       "source": "/((?!brand/).*)",
       "headers": [
         {

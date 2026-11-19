@@ -1,11 +1,6 @@
 User-agent: *
 Allow: /
 
-Disallow: /tenant
-Disallow: /tenant/
-Disallow: /super-admin
-Disallow: /super-admin/
-Disallow: /super-auth
 Disallow: /reset-password
 
 Sitemap: https://itemtraxx.com/sitemap.xml

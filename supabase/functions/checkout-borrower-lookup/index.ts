@@ -10,6 +10,7 @@ import { validateAccountDeviceSession } from "../_shared/accountSessions.ts";
 import { resolveWorkspaceAccess } from "../_shared/workspaceAccess.ts";
 import {
   requireText,
+  optionalText,
   BORROWER_ID_PATTERN,
   ValidationError,
 } from "../_shared/validation.ts";
@@ -128,7 +129,7 @@ serve((req) => withRequestSpan(req, "POST /functions/checkout-borrower-lookup", 
     }
 
     const body = await readJsonBody(req, 8 * 1024);
-    const deviceId = requireText(body.device_id, { maxLen: 128 });
+    const deviceId = optionalText(body.device_id, { maxLen: 128 });
     const adminClient = createClient(supabaseUrl, serviceKey, {
       global: { headers: { traceparent: span.traceparent() } },
       auth: { persistSession: false },

@@ -68,6 +68,7 @@ const makeAdminClient = (
         "delete",
         "eq",
         "neq",
+        "or",
         "is",
         "not",
         "in",
@@ -828,17 +829,6 @@ Deno.test("revoke_session reports not-found when nothing matched", async () => {
   assertEquals(await responseBody(response!), { error: "Session not found." });
 });
 
-Deno.test("revoke_session succeeds", async () => {
-  const { client } = makeAdminClient(sequence([{ data: [{ id: "session-1" }], error: null }]));
-  const response = await handleSecuritySessionsAction(
-    contextFor("revoke_session", { session_id: "session-1" }, client),
-  );
-
-  assert(response !== null, "expected a response");
-  assertEquals(response!.status, 200);
-  assertEquals(await responseBody(response!), { data: { revoked: true } });
-});
-
 Deno.test("revoke_session deletes the matching Better Auth session and audits it", async () => {
   await withMockedBetterAuthFetch(
     (_url, init) => {
@@ -851,7 +841,7 @@ Deno.test("revoke_session deletes the matching Better Auth session and audits it
     },
     async () => {
       const { client } = makeAdminClient(
-        sequence([{ data: [{ id: "session-1", auth_session_id: "auth-session-2" }], error: null }]),
+        sequence([{ data: [{ id: "session-1", auth_session_id: "auth-session-2" }], error: null }, { data: [{ id: "session-1" }], error: null }]),
       );
       const auditCalls: unknown[][] = [];
       const response = await handleSecuritySessionsAction(
@@ -865,7 +855,7 @@ Deno.test("revoke_session deletes the matching Better Auth session and audits it
       assert(response !== null, "expected a response");
       assertEquals(response!.status, 200);
       assertEquals(await responseBody(response!), { data: { revoked: true } });
-      assertEquals(auditCalls, [[
+      assertEquals(auditCalls.slice(1), [[
         "super_admin_session_revoked",
         "super_admin_auth",
         "00000000-0000-4000-8000-000000000001",
@@ -901,8 +891,8 @@ Deno.test("revoke_session reports and audits a failed Better Auth revocation", a
       assertEquals(await responseBody(response!), {
         error: "Unable to sign out the revoked session.",
       });
-      assertEquals(auditCalls.length, 1);
-      assertEquals((auditCalls[0][3] as Record<string, unknown>).better_auth_revocation_ok, false);
+      assertEquals(auditCalls.length, 2);
+      assertEquals((auditCalls[1][3] as Record<string, unknown>).better_auth_revocation_ok, false);
     },
   );
 });
@@ -913,7 +903,7 @@ Deno.test("revoke_session reports and audits a failed Better Auth revocation", a
 
 Deno.test("revoke_all_sessions excludes the current auth session by default", async () => {
   const { client, calls } = makeAdminClient(
-    sequence([{ data: [{ id: "session-1" }, { id: "session-2" }], error: null }]),
+    sequence([{ data: [], error: null }]),
   );
   const response = await handleSecuritySessionsAction(
     contextFor("revoke_all_sessions", { device_id: "device-1" }, client),
@@ -921,11 +911,11 @@ Deno.test("revoke_all_sessions excludes the current auth session by default", as
 
   assert(response !== null, "expected a response");
   assertEquals(response!.status, 200);
-  assertEquals(await responseBody(response!), { data: { revoked: 2 } });
+  assertEquals(await responseBody(response!), { data: { revoked: 0 } });
   assert(
     calls.some((call) =>
       call.operations.some((op) =>
-        op.method === "neq" && op.args[0] === "auth_session_id" && op.args[1] === "auth-session-1"
+        op.method === "or" && op.args[0] === 'auth_session_id.is.null,auth_session_id.neq."auth-session-1"'
       )
     ),
     "expected the current auth session to be excluded",
@@ -934,7 +924,7 @@ Deno.test("revoke_all_sessions excludes the current auth session by default", as
 
 Deno.test("revoke_all_sessions falls back to excluding the current device when auth claims are unavailable", async () => {
   const { client, calls } = makeAdminClient(
-    sequence([{ data: [{ id: "session-1" }], error: null }]),
+    sequence([{ data: [], error: null }]),
     { claims: null },
   );
   const response = await handleSecuritySessionsAction(
@@ -954,14 +944,14 @@ Deno.test("revoke_all_sessions falls back to excluding the current device when a
 });
 
 Deno.test("revoke_all_sessions signs out every device including the current one when requested", async () => {
-  const { client, calls } = makeAdminClient(sequence([{ data: [{ id: "session-1" }], error: null }]));
+  const { client, calls } = makeAdminClient(sequence([{ data: [], error: null }]));
   const response = await handleSecuritySessionsAction(
     contextFor("revoke_all_sessions", { device_id: "device-1", sign_out_current: true }, client),
   );
 
   assert(response !== null, "expected a response");
   assertEquals(response!.status, 200);
-  assertEquals(await responseBody(response!), { data: { revoked: 1 } });
+  assertEquals(await responseBody(response!), { data: { revoked: 0 } });
   assert(
     !calls.some((call) => call.operations.some((op) => op.method === "neq")),
     "expected no device exclusion when signing out every device",
@@ -985,10 +975,9 @@ Deno.test("revoke_all_sessions deletes each revoked Better Auth session once", a
             { id: "session-2", auth_session_id: "auth-session-2" },
             { id: "session-3", auth_session_id: "auth-session-2" },
             { id: "session-4", auth_session_id: "auth-session-3" },
-            { id: "session-5", auth_session_id: null },
           ],
           error: null,
-        }]),
+        }, ...Array.from({ length: 3 }, () => ({ data: [{ id: "updated" }], error: null }))]),
       );
       const auditCalls: unknown[][] = [];
       const response = await handleSecuritySessionsAction(
@@ -1001,13 +990,13 @@ Deno.test("revoke_all_sessions deletes each revoked Better Auth session once", a
 
       assert(response !== null, "expected a response");
       assertEquals(response!.status, 200);
-      assertEquals(await responseBody(response!), { data: { revoked: 4 } });
-      assertEquals(auditCalls, [[
+      assertEquals(await responseBody(response!), { data: { revoked: 3 } });
+      assertEquals(auditCalls.slice(1), [[
         "super_admin_sessions_revoked",
         "super_admin_auth",
         "00000000-0000-4000-8000-000000000001",
         {
-          revoked: 4,
+          revoked: 3,
           sign_out_current: false,
           better_auth_sessions_requested: 2,
           better_auth_sessions_revoked: 2,
@@ -1040,4 +1029,81 @@ Deno.test("revoke_all_sessions reports a generic failure for other errors", asyn
   assert(response !== null, "expected a response");
   assertEquals(response!.status, 400);
   assertEquals(await responseBody(response!), { error: "Unable to revoke sessions." });
+});
+
+Deno.test("failed Better Auth deletion leaves the overlay available for retry", async () => {
+  await withMockedBetterAuthFetch(
+    () => betterAuthAdminResponse({ error: "Unavailable" }, 503),
+    async () => {
+      const { client, calls } = makeAdminClient(() => ({ data: [{ id: "session-1", auth_session_id: "auth-session-2" }], error: null }));
+      const response = await handleSecuritySessionsAction(contextFor("revoke_session", { session_id: "session-1" }, client));
+      assertEquals(response?.status, 503);
+      assert(!calls.some((call) => call.operations.some((op) => op.method === "update")), "overlay must remain unchanged until auth deletion succeeds");
+    },
+  );
+});
+
+Deno.test("unbound session reports incomplete revocation", async () => {
+  const { client } = makeAdminClient(() => ({ data: [{ id: "session-1", auth_session_id: null }], error: null }));
+  const response = await handleSecuritySessionsAction(contextFor("revoke_session", { session_id: "session-1" }, client));
+  assertEquals(response?.status, 503);
+});
+
+Deno.test("revocation retries a previously revoked but incomplete row", async () => {
+  await withMockedBetterAuthFetch(
+    () => betterAuthAdminResponse({ revoked: 0 }),
+    async () => {
+      const { client, calls } = makeAdminClient((call) => {
+        if (call.operations.some((op) => op.method === "update")) {
+          return { data: [{ id: "session-1" }], error: null };
+        }
+        const excludesRevoked = call.operations.some((op) => op.method === "is" && op.args[0] === "revoked_at");
+        return { data: excludesRevoked ? [] : [{ id: "session-1", auth_session_id: "auth-session-2", revoked_at: "2026-01-01T00:00:00Z", better_auth_revocation_completed_at: null }], error: null };
+      });
+      const response = await handleSecuritySessionsAction(contextFor("revoke_session", { session_id: "session-1" }, client));
+      assertEquals(response?.status, 200);
+      const update = calls.find((call) => call.operations.some((op) => op.method === "update"));
+      assert(!!update?.operations.some((op) => op.method === "is" && op.args[0] === "better_auth_revocation_completed_at"), "completion update must be conditional");
+      const payload = update?.operations.find((op) => op.method === "update")?.args[0] as Record<string, unknown>;
+      assert(typeof payload.better_auth_revocation_completed_at === "string", "completion must be recorded");
+    },
+  );
+});
+
+Deno.test("single revocation retries after a 503 and completes once", async () => {
+  let attempts = 0;
+  let completed = false;
+  const { client } = makeAdminClient((call) => {
+    if (call.operations.some((op) => op.method === "update")) {
+      completed = true;
+      return { data: [{ id: "session-1" }], error: null };
+    }
+    return { data: [{ id: "session-1", auth_session_id: "auth-session-2", revoked_at: null, better_auth_revocation_completed_at: completed ? "done" : null }], error: null };
+  });
+  await withMockedBetterAuthFetch(() => {
+    attempts++;
+    return attempts === 1 ? betterAuthAdminResponse({ error: "Unavailable" }, 503) : betterAuthAdminResponse({ revoked: 1 });
+  }, async () => {
+    const context = contextFor("revoke_session", { session_id: "session-1" }, client);
+    assertEquals((await handleSecuritySessionsAction(context))?.status, 503);
+    assertEquals(completed, false);
+    assertEquals((await handleSecuritySessionsAction(context))?.status, 200);
+    assertEquals(completed, true);
+    assertEquals((await handleSecuritySessionsAction(context))?.status, 200);
+    assertEquals(attempts, 2);
+  });
+});
+
+Deno.test("concurrent completion accepts only the same auth binding", async () => {
+  for (const binding of ["auth-session-2", "replacement"]) {
+    const { client } = makeAdminClient((call) => {
+      if (call.operations.some((op) => op.method === "update")) return { data: [], error: null };
+      if (call.operations.some((op) => op.method === "maybeSingle")) return { data: { id: "session-1", auth_session_id: binding, better_auth_revocation_completed_at: "done" }, error: null };
+      return { data: [{ id: "session-1", auth_session_id: "auth-session-2" }], error: null };
+    });
+    await withMockedBetterAuthFetch(() => betterAuthAdminResponse({ revoked: 0 }), async () => {
+      const response = await handleSecuritySessionsAction(contextFor("revoke_session", { session_id: "session-1" }, client));
+      assertEquals(response?.status, binding === "auth-session-2" ? 200 : 503);
+    });
+  }
 });

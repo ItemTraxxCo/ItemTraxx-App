@@ -34,6 +34,29 @@ const isMissingColumn = (
 const sanitizeText = (value: unknown, max = 255) =>
   optionalText(value, { maxLen: max });
 
+// Revocation must also delete the underlying Better Auth session: revoked_at
+// alone leaves the session cookie valid until its own expiry.
+const deleteBetterAuthSessions = async (
+  adminClient: SuperOpsContext["adminClient"],
+  sessionIds: ReadonlyArray<string | null | undefined>,
+) => {
+  const ids = [...new Set(
+    sessionIds.filter((id): id is string => typeof id === "string" && !!id),
+  )];
+  if (!ids.length) return;
+  const { error } = await adminClient
+    .schema("better_auth")
+    .from("session")
+    .delete()
+    .in("id", ids);
+  if (error && !isMissingRelation(error, "session")) {
+    console.error("Unable to delete Better Auth sessions on revocation", {
+      count: ids.length,
+      code: error.code,
+    });
+  }
+};
+
 const resolveAuthSessionId = async (
   adminClient: SuperOpsContext["adminClient"],
   accessToken: string,
@@ -437,7 +460,7 @@ export const handleSecuritySessionsAction = async (
       .eq("id", sessionId)
       .eq("profile_id", user.id)
       .is("revoked_at", null)
-      .select("id");
+      .select("id, auth_session_id");
     if (error && isMissingRelation(error, "super_admin_sessions")) {
       return jsonResponse(400, {
         error: "Session controls unavailable. Run latest SQL setup.",
@@ -449,6 +472,10 @@ export const handleSecuritySessionsAction = async (
     if (!data?.length) {
       return jsonResponse(404, { error: "Session not found." });
     }
+    await deleteBetterAuthSessions(
+      adminClient,
+      data.map((row: { auth_session_id?: string | null }) => row.auth_session_id),
+    );
     return jsonResponse(200, { data: { revoked: true } });
   }
 
@@ -475,14 +502,14 @@ export const handleSecuritySessionsAction = async (
         query = query.neq("device_id", currentDeviceId);
       }
     }
-    let { data, error } = await query.select("id");
+    let { data, error } = await query.select("id, auth_session_id");
     if (
       error && currentAuthSessionId && currentDeviceId &&
       isMissingColumn(error, "auth_session_id")
     ) {
       const fallback = await buildQuery()
         .neq("device_id", currentDeviceId)
-        .select("id");
+        .select("id, auth_session_id");
       data = fallback.data;
       error = fallback.error;
     }
@@ -494,6 +521,12 @@ export const handleSecuritySessionsAction = async (
     if (error) {
       return jsonResponse(400, { error: "Unable to revoke sessions." });
     }
+    await deleteBetterAuthSessions(
+      adminClient,
+      (data ?? []).map(
+        (row: { auth_session_id?: string | null }) => row.auth_session_id,
+      ),
+    );
     return jsonResponse(200, { data: { revoked: (data ?? []).length } });
   }
 

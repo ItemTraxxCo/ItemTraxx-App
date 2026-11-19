@@ -9,6 +9,7 @@ import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 import { validateAccountDeviceSession } from "../_shared/accountSessions.ts";
 import { resolveWorkspaceAccess } from "../_shared/workspaceAccess.ts";
 import {
+  optionalText,
   requireText,
   BORROWER_ID_PATTERN,
   ValidationError,
@@ -128,7 +129,7 @@ serve((req) => withRequestSpan(req, "POST /functions/checkout-borrower-lookup", 
     }
 
     const body = await readJsonBody(req, 8 * 1024);
-    const deviceId = typeof body.device_id === "string" ? body.device_id.trim() : "";
+    const deviceId = optionalText(body.device_id, { maxLen: 128 });
     const adminClient = createClient(supabaseUrl, serviceKey, {
       global: { headers: { traceparent: span.traceparent() } },
       auth: { persistSession: false },

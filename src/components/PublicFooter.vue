@@ -33,7 +33,7 @@
         <p class="footer-heading">Support</p>
         <RouterLink to="/contact-support">Contact Support</RouterLink>
         <RouterLink to="/report-security-issue">Report Security Issue</RouterLink>
-        <RouterLink to="/changelog">Changelog</RouterLink>
+        <RouterLink to="/index/changelog">Changelog</RouterLink>
         <RouterLink to="/faq">FAQ</RouterLink>
         <a href="https://status.itemtraxx.com/" target="_blank" rel="noreferrer">Status</a>
       </div>

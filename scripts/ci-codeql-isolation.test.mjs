@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import yaml from "js-yaml";
+import * as yaml from "js-yaml";
 
 const workflow = (path) => yaml.load(readFileSync(new URL(path, import.meta.url), "utf8"));
 const ci = workflow("../.github/workflows/ci.yml");

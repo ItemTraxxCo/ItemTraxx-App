@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import yaml from "js-yaml";
+import * as yaml from "js-yaml";
 
 const validation = yaml.load(
   readFileSync(new URL("../.github/workflows/ci-validation.yml", import.meta.url), "utf8"),

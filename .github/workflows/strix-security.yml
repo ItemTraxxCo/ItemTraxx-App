@@ -90,7 +90,7 @@ jobs:
         id: nim-preflight
         env:
           NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
-          NVIDIA_NIM_MODEL: z-ai/glm-5.3
+          NVIDIA_NIM_MODEL: z-ai/glm-5.3-flash
         run: |
           set -euo pipefail
           response_file="$RUNNER_TEMP/nvidia-nim-response.json"
@@ -391,7 +391,7 @@ jobs:
         if: ${{ always() && steps.nim-preflight.outputs.ok == 'true' }}
         timeout-minutes: 360
         env:
-          STRIX_LLM: nvidia_nim/z-ai/glm-5.3
+          STRIX_LLM: nvidia_nim/z-ai/glm-5.3-flash
           LLM_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
           STRIX_REASONING_EFFORT: low
           STRIX_DIFF_BASE: origin/${{ github.base_ref || github.event.repository.default_branch }}

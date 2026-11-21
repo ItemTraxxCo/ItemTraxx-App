@@ -1,4 +1,3 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.108.2";
 import { resolveTrustedGeneralLocation } from "../../_shared/requestMetadata.ts";
 import {
   isMissingPrivilegedStepUpTable,

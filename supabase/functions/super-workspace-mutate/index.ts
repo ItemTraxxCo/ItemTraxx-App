@@ -106,8 +106,7 @@ export const SUPER_WORKSPACE_ACTIONS = [
   "send_individual_account_reset",
 ] as const;
 serve(async (req) => {
-  const origin = req.headers.get("origin"),
-    { originAllowed, headers } = resolveCorsHeaders(req, corsBase);
+  const { originAllowed, headers } = resolveCorsHeaders(req, corsBase);
   const json = (status: number, body: Record<string, unknown>) =>
     new Response(JSON.stringify({ ok: status < 400, ...body }), {
       status,

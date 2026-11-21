@@ -119,13 +119,13 @@ export const toUserFacingErrorMessage = (error: unknown, fallbackMessage: string
       if (normalized.includes("borrower not found")) return "Borrower not found. Please check the borrower ID and try again.";
       if (normalized.includes("missing tenant context")) return "Your session is missing required account information. Please sign out and sign in again.";
       if (normalized.includes("rate limit")) return "Too many requests right now. Please try again in a moment.";
-      if (normalized.includes("timed out")) return "Request timed out. Unable to reach ItemTraxx servers. Please try again. and check your connection.";
+      if (normalized.includes("timed out")) return "Request timed out. Unable to reach ItemTraxx servers. Please try again and check your connection.";
       return fallbackMessage;
     }
   }
 
   if (normalized === "unauthorized" || normalized === "unauthorized.") {
-    return "Your session has  expired. Please sign in again.";
+    return "Your session has expired. Please sign in again.";
   }
   if (normalized.includes("network request failed")) {
     return "Unable to reach ItemTraxx servers. Check your connection and try again. Reloading the page may fix the issue.";

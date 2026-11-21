@@ -13,7 +13,7 @@ import {
   RequestBodyLimitError,
 } from "./requestBody.ts";
 import { sanitizeRequestHeaders } from "./requestHeaders.ts";
-import { buildError, buildSessionRateLimitError } from "./responses.ts";
+import { buildError } from "./responses.ts";
 import { getSupabaseAccessToken } from "./auth.ts";
 import { applyTrustedIngressHeaders } from "./trustedIngress.ts";
 import { enforcePublicRequestLimit } from "./publicRequestRateLimit.ts";

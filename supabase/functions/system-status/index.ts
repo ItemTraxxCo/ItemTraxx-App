@@ -236,9 +236,9 @@ serve((req) => withRequestSpan(req, "GET /functions/system-status", async (span,
       }
     }
 
-    let incidentStatus: "operational" | "degraded" | "down" = "operational";
-    let incidentSummary = "not configured";
-    let incidentCheck: "ok" | "warn" | "unavailable" = "unavailable";
+    let incidentStatus: "operational" | "degraded" | "down";
+    let incidentSummary: string;
+    let incidentCheck: "ok" | "warn" | "unavailable";
     const killSwitchActive = isKillSwitchEnabled() && !isLocalhostBypassRequest(req);
     let broadcast: {
       enabled: boolean;

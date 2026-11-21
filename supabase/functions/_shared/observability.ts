@@ -1020,10 +1020,8 @@ export const withRequestSpan = async (
 ) => {
   const requestId = getRequestId(req);
   const span = startRequestSpan(req, operation, requestId);
-  let status = 500;
   try {
     const response = await handler(span, requestId);
-    status = response.status;
     span.setAttribute("http.response.status_code", response.status);
     span.setStatus(response.status >= 500 ? "error" : "ok");
     return response;

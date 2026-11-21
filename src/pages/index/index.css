@@ -29,6 +29,12 @@
   box-sizing: border-box;
 }
 
+.index-page {
+  /* The document is scaled to 90%, so compensate the viewport height on this short page. */
+  min-height: calc(100vh / 0.9);
+  min-height: calc(100dvh / 0.9);
+}
+
 .index-page .visually-hidden,
 .index-article-page .visually-hidden,
 .index-about-page .visually-hidden {

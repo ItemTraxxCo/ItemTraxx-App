@@ -31,7 +31,12 @@ jobs:
   kill-switch-preflight:
     # Scan the promotion PR: staging -> preview.
     needs: require-trusted-ref
-    if: ${{ needs.require-trusted-ref.result == 'success' && (github.event_name == 'workflow_dispatch' || (github.event.pull_request.base.ref == 'preview' && github.event.pull_request.head.ref == 'staging')) }}
+    if: >-
+      ${{ needs.require-trusted-ref.result == 'success' &&
+          (github.event_name == 'workflow_dispatch' ||
+           (github.event.pull_request.head.repo.full_name == github.repository &&
+            github.event.pull_request.base.ref == 'preview' &&
+            github.event.pull_request.head.ref == 'staging')) }}
     uses: ./.github/workflows/kill-switch-preflight.yml
     with:
       status_source: supabase
@@ -42,36 +47,42 @@ jobs:
       - kill-switch-preflight
     # Strix v1.6.1 includes recoverable unknown-tool handling for the
     # ModelBehaviorError reproduced in ItemTraxx CI.
-    if: ((needs.require-trusted-ref.result == 'success' && needs.kill-switch-preflight.result == 'success') && (github.event_name == 'workflow_dispatch' || (github.event.pull_request.base.ref == 'preview' && github.event.pull_request.head.ref == 'staging')) && needs.kill-switch-preflight.outputs.active == 'false')
+    if: >-
+      ${{ needs.require-trusted-ref.result == 'success' &&
+          needs.kill-switch-preflight.result == 'success' &&
+          (github.event_name == 'workflow_dispatch' ||
+           (github.event.pull_request.head.repo.full_name == github.repository &&
+            github.event.pull_request.base.ref == 'preview' &&
+            github.event.pull_request.head.ref == 'staging')) &&
+          needs.kill-switch-preflight.outputs.active == 'false' }}
     permissions:
       contents: read
-      pull-requests: write
     runs-on: ubuntu-24.04
     # Leave time to summarize and upload results if the bounded scan times out.
     timeout-minutes: 360
 
     steps:
-      - name: Report paused PR scan
-        if: ${{ github.event_name == 'pull_request' }}
-        run: |
-          cat >> "$GITHUB_STEP_SUMMARY" <<'EOF'
-          ## Strix PR scan temporarily paused
-
-          This required check cannot pass until Strix has completed a scan. PR scans are temporarily paused while we address repeated multi-hour scans that end with incomplete coverage.
-          EOF
-          echo "Strix is temporarily paused for pull requests; this check did not scan the code." >&2
-          exit 1
-
       # Full history lets Strix resolve the pull-request diff scope reliably.
       - name: Checkout
-        if: ${{ github.event_name == 'workflow_dispatch' }}
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
 
+      - name: Pause Strix promotion scan while the harness is unstable
+        id: strix-harness-guard
+        if: ${{ github.event_name == 'pull_request' && github.base_ref == 'preview' && github.head_ref == 'staging' }}
+        run: |
+          echo "paused=true" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Strix scan intentionally paused"
+            echo
+            echo "The staging-to-preview check is failing closed while Strix has known late-run coverage and recovery failures."
+            echo "No NVIDIA preflight or Strix scan was started."
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Install Strix
-        if: ${{ github.event_name == 'workflow_dispatch' }}
+        if: ${{ steps.strix-harness-guard.outputs.paused != 'true' }}
         env:
           STRIX_VERSION: 1.6.1
           # SHA-256 published for strix-1.6.1-linux-x86_64.tar.gz.
@@ -90,10 +101,10 @@ jobs:
 
       - name: Preflight NVIDIA NIM endpoint
         id: nim-preflight
-        if: ${{ github.event_name == 'workflow_dispatch' }}
+        if: ${{ steps.strix-harness-guard.outputs.paused != 'true' }}
         env:
           NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
-          NVIDIA_NIM_MODEL: z-ai/glm-5.3
+          NVIDIA_NIM_MODEL: z-ai/glm-5.3-flash
         run: |
           set -euo pipefail
           response_file="$RUNNER_TEMP/nvidia-nim-response.json"
@@ -391,10 +402,10 @@ jobs:
 
       - name: Run Strix security scan
         id: strix-scan
-        if: ${{ github.event_name == 'workflow_dispatch' && always() && steps.nim-preflight.outputs.ok == 'true' }}
+        if: ${{ always() && steps.nim-preflight.outputs.ok == 'true' }}
         timeout-minutes: 360
         env:
-          STRIX_LLM: nvidia_nim/z-ai/glm-5.3
+          STRIX_LLM: nvidia_nim/z-ai/glm-5.3-flash
           LLM_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
           STRIX_REASONING_EFFORT: low
           STRIX_DIFF_BASE: origin/${{ github.base_ref || github.event.repository.default_branch }}
@@ -418,7 +429,7 @@ jobs:
 
       - name: Prepare Strix PR summary
         id: strix-summary
-        if: ${{ always() && github.event_name == 'workflow_dispatch' }}
+        if: ${{ always() && steps.strix-harness-guard.outputs.paused != 'true' }}
         env:
           STRIX_EXIT_CODE: ${{ steps.strix-scan.outputs.exit_code }}
         run: |
@@ -426,11 +437,12 @@ jobs:
           python3 scripts/prepare-strix-pr-summary.py \
             --exit-code "$strix_exit_code" \
             --output "$RUNNER_TEMP/strix-pr-comment.md"
+          cat "$RUNNER_TEMP/strix-pr-comment.md" >> "$GITHUB_STEP_SUMMARY"
           echo "comment_path=$RUNNER_TEMP/strix-pr-comment.md" >> "$GITHUB_OUTPUT"
 
       - name: Validate Strix coverage completeness
         id: strix-coverage
-        if: ${{ always() && github.event_name == 'workflow_dispatch' }}
+        if: ${{ always() && steps.strix-harness-guard.outputs.paused != 'true' }}
         run: |
           set -euo pipefail
           python3 - <<'PY'
@@ -474,7 +486,7 @@ jobs:
           PY
 
       - name: Upload Strix results
-        if: ${{ always() && github.event_name == 'workflow_dispatch' }}
+        if: ${{ always() && steps.strix-harness-guard.outputs.paused != 'true' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.0
         with:
           name: strix-results-${{ github.run_id }}
@@ -491,13 +503,19 @@ jobs:
           retention-days: 30
 
       - name: Fail on Strix findings or execution error
-        if: ${{ always() && github.event_name == 'workflow_dispatch' && (steps.nim-preflight.outputs.ok != 'true' || steps.strix-scan.outputs.exit_code != '0' || steps.strix-coverage.outputs.complete != 'true') }}
+        if: ${{ always() && (steps.strix-harness-guard.outputs.paused == 'true' || steps.nim-preflight.outputs.ok != 'true' || steps.strix-scan.outputs.exit_code != '0' || steps.strix-coverage.outputs.complete != 'true') }}
         env:
+          STRIX_PAUSED: ${{ steps.strix-harness-guard.outputs.paused }}
           NIM_PREFLIGHT_OK: ${{ steps.nim-preflight.outputs.ok }}
           STRIX_EXIT_CODE: ${{ steps.strix-scan.outputs.exit_code }}
           STRIX_COVERAGE_COMPLETE: ${{ steps.strix-coverage.outputs.complete }}
         run: |
           set -euo pipefail
+          if [[ "$STRIX_PAUSED" == "true" ]]; then
+            echo "Strix is intentionally paused for staging-to-preview PRs due to known harness instability."
+            echo "No NVIDIA preflight or Strix scan was started; this check fails closed."
+            exit 1
+          fi
           if [[ "$NIM_PREFLIGHT_OK" != "true" ]]; then
             echo "NVIDIA NIM preflight failed; Strix did not run."
             exit 1

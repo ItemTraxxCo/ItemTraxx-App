@@ -69,7 +69,20 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      - name: Pause Strix promotion scan while the harness is unstable
+        id: strix-harness-guard
+        if: ${{ github.event_name == 'pull_request' && github.base_ref == 'preview' && github.head_ref == 'staging' }}
+        run: |
+          echo "paused=true" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Strix scan intentionally paused"
+            echo
+            echo "The staging-to-preview check is failing closed while Strix has known late-run coverage and recovery failures."
+            echo "No NVIDIA preflight or Strix scan was started."
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Install Strix
+        if: ${{ steps.strix-harness-guard.outputs.paused != 'true' }}
         env:
           STRIX_VERSION: 1.6.1
           # SHA-256 published for strix-1.6.1-linux-x86_64.tar.gz.
@@ -88,6 +101,7 @@ jobs:
 
       - name: Preflight NVIDIA NIM endpoint
         id: nim-preflight
+        if: ${{ steps.strix-harness-guard.outputs.paused != 'true' }}
         env:
           NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
           NVIDIA_NIM_MODEL: z-ai/glm-5.3-flash
@@ -415,7 +429,7 @@ jobs:
 
       - name: Prepare Strix PR summary
         id: strix-summary
-        if: always()
+        if: ${{ always() && steps.strix-harness-guard.outputs.paused != 'true' }}
         env:
           STRIX_EXIT_CODE: ${{ steps.strix-scan.outputs.exit_code }}
         run: |
@@ -428,7 +442,7 @@ jobs:
 
       - name: Validate Strix coverage completeness
         id: strix-coverage
-        if: always()
+        if: ${{ always() && steps.strix-harness-guard.outputs.paused != 'true' }}
         run: |
           set -euo pipefail
           python3 - <<'PY'
@@ -472,7 +486,7 @@ jobs:
           PY
 
       - name: Upload Strix results
-        if: always()
+        if: ${{ always() && steps.strix-harness-guard.outputs.paused != 'true' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.0
         with:
           name: strix-results-${{ github.run_id }}
@@ -489,13 +503,19 @@ jobs:
           retention-days: 30
 
       - name: Fail on Strix findings or execution error
-        if: ${{ always() && (steps.nim-preflight.outputs.ok != 'true' || steps.strix-scan.outputs.exit_code != '0' || steps.strix-coverage.outputs.complete != 'true') }}
+        if: ${{ always() && (steps.strix-harness-guard.outputs.paused == 'true' || steps.nim-preflight.outputs.ok != 'true' || steps.strix-scan.outputs.exit_code != '0' || steps.strix-coverage.outputs.complete != 'true') }}
         env:
+          STRIX_PAUSED: ${{ steps.strix-harness-guard.outputs.paused }}
           NIM_PREFLIGHT_OK: ${{ steps.nim-preflight.outputs.ok }}
           STRIX_EXIT_CODE: ${{ steps.strix-scan.outputs.exit_code }}
           STRIX_COVERAGE_COMPLETE: ${{ steps.strix-coverage.outputs.complete }}
         run: |
           set -euo pipefail
+          if [[ "$STRIX_PAUSED" == "true" ]]; then
+            echo "Strix is intentionally paused for staging-to-preview PRs due to known harness instability."
+            echo "No NVIDIA preflight or Strix scan was started; this check fails closed."
+            exit 1
+          fi
           if [[ "$NIM_PREFLIGHT_OK" != "true" ]]; then
             echo "NVIDIA NIM preflight failed; Strix did not run."
             exit 1

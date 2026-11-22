@@ -25,15 +25,6 @@
   ],
   "headers": [
     {
-      "source": "/assets/(.*)",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=31536000, immutable"
-        }
-      ]
-    },
-    {
       "source": "/(robots\\.txt|sitemap\\.xml|llms\\.txt)",
       "headers": [
         {
@@ -85,7 +76,15 @@
           "key": "Vary",
           "value": "Accept, Accept-Encoding"
         }
-        
+      ]
+    },
+    {
+      "source": "/assets/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
       ]
     },
     {

@@ -3,7 +3,7 @@ title: Building & Scaling ItemTraxx
 slug: building-and-scaling
 category: Company
 format: Article
-date: 2026-11-20
+date: 2026-11-22
 draft: true
 ---
 

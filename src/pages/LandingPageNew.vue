@@ -474,7 +474,7 @@ onBeforeUnmount(() => {
 <template>
   <div id="top" class="itemtraxx-page">
 <header class="site-header wrap" @keydown.esc="menuOpen = false">
-    <a class="brand" href="#top" aria-label="ItemTraxx home"><img :src="itemtraxxLogo" alt="ItemTraxx Co" width="1500" height="500"></a>
+    <a class="brand" href="#top" aria-label="ItemTraxx home"><img :src="itemtraxxLogo" alt="ItemTraxx Co" width="150" height="50"></a>
     <nav id="main-nav" class="main-nav" :class="{ 'is-open': menuOpen }" aria-label="Main navigation" @click="menuOpen = false"><a href="/pricing">Pricing</a><a href="/contact-support">Support</a><a href="/getting-started">Getting Started</a><a href="/security">Security</a><a class="status-link" href="https://status.itemtraxx.com/" target="_blank" rel="noreferrer" aria-label="Open system status page"><span class="status-dot" :class="statusClass" aria-hidden="true"></span>{{ statusLabel }}</a></nav>
     <div class="header-actions">
       <button class="menu-toggle" type="button" aria-controls="main-nav" :aria-expanded="menuOpen" aria-label="Menu" @click="menuOpen = !menuOpen"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 6h14M3 10h14M3 14h14"/></svg></button>

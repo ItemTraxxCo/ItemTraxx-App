@@ -518,7 +518,7 @@ onBeforeUnmount(() => {
             </article>
             <div class="transform-arrow" aria-hidden="true"><svg viewBox="0 0 40 40" fill="none"><path d="M5 20h27m-10-10 10 10-10 10" stroke="currentColor" stroke-width="1.8" stroke-linecap="square" stroke-linejoin="miter"/></svg></div>
             <article class="compare-panel" id="checkout">
-              <div class="media-frame checkout-image"><img :src="checkoutReturnUiImage1600" :srcset="`${checkoutReturnUiImage800} 800w, ${checkoutReturnUiImage1200} 1200w, ${checkoutReturnUiImage1600} 1600w`" sizes="(max-width: 700px) 92vw, (max-width: 1300px) 46vw, 600px" alt="ItemTraxx checkout and return screen showing borrower details, checked-out items and checkout controls" width="1600" height="1035"></div>
+              <div class="media-frame checkout-image"><img :src="checkoutReturnUiImage1600" :srcset="`${checkoutReturnUiImage800} 800w, ${checkoutReturnUiImage1200} 1200w, ${checkoutReturnUiImage1600} 1600w`" sizes="(max-width: 700px) 92vw, (max-width: 1300px) 46vw, 600px" alt="ItemTraxx checkout and return screen showing borrower details, checked-out items and checkout controls" width="1600" height="1035" loading="eager" fetchpriority="high"></div>
             </article>
           </div>
         </div>

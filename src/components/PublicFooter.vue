@@ -105,6 +105,8 @@ onUnmounted(() => {
 
 <style scoped>
 .public-footer {
+  min-height: 27rem;
+  contain: layout style;
   width: min(1280px, 92vw);
   margin-top: 3.6rem;
   margin-left: auto;
@@ -134,6 +136,8 @@ onUnmounted(() => {
 }
 
 .footer-grid {
+  min-height: 27rem;
+  contain: layout style;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 1.5rem 2.5rem;
@@ -249,13 +253,37 @@ button.footer-theme-toggle:hover:not(:disabled) {
   opacity: 1;
 }
 
+/* Legal-link wrapping raises the four-column footer just above the 900px stack breakpoint. */
+@media (min-width: 901px) and (max-width: 914px) {
+  .public-footer,
+  .footer-grid {
+    min-height: 31rem;
+  }
+}
+
+@media (min-width: 915px) and (max-width: 919px) {
+  .public-footer,
+  .footer-grid {
+    min-height: 29.5rem;
+  }
+}
+
+@media (min-width: 920px) and (max-width: 939px) {
+  .public-footer,
+  .footer-grid {
+    min-height: 28rem;
+  }
+}
+
 @media (max-width: 900px) {
   .public-footer {
+    min-height: 50rem;
     flex-direction: column;
     gap: 1rem;
   }
 
   .footer-grid {
+    min-height: 39rem;
     width: 100%;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 1.2rem 1.8rem;
@@ -264,10 +292,12 @@ button.footer-theme-toggle:hover:not(:disabled) {
 
 @media (max-width: 640px) {
   .public-footer {
+    min-height: 75rem;
     width: min(1280px, calc(100vw - 1.5rem));
   }
 
   .footer-grid {
+    min-height: 63rem;
     grid-template-columns: 1fr;
     gap: 1rem;
   }

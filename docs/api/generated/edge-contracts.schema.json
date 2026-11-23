@@ -705,29 +705,6 @@
                   ],
                   "additionalProperties": false
                 },
-                "maintenance": {
-                  "anyOf": [
-                    {
-                      "type": "object",
-                      "properties": {
-                        "enabled": {
-                          "type": "boolean"
-                        },
-                        "message": {
-                          "type": "string"
-                        }
-                      },
-                      "required": [
-                        "enabled",
-                        "message"
-                      ],
-                      "additionalProperties": false
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
                 "recent_status_events": {
                   "type": "array",
                   "items": {
@@ -800,7 +777,6 @@
                 "checkout_due_hours",
                 "updates",
                 "feature_flags",
-                "maintenance",
                 "recent_status_events"
               ],
               "additionalProperties": false

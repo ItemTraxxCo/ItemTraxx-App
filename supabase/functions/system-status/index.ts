@@ -22,109 +22,14 @@ const corsHeaders = {
   Vary: "Origin",
 };
 
-type IncidentImpact =
-  | "operational"
-  | "degraded_performance"
-  | "partial_outage"
-  | "full_outage";
-
-type IncidentComponent = {
-  current_status?: IncidentImpact;
-};
-
-type OngoingIncident = {
-  current_worst_impact?: IncidentImpact;
-  affected_components?: IncidentComponent[];
-};
-
-type IncidentWidgetPayload = {
-  ongoing_incidents?: OngoingIncident[];
-  in_progress_maintenances?: unknown[];
-  scheduled_maintenances?: unknown[];
-};
-
 // This endpoint is intentionally public and unauthenticated -- the app shell
 // probes it before any session exists, and external status consumers may call
-// the origin directly. What it should not be is a free amplifier: each request
-// otherwise costs a service-role DB probe, three app_runtime_config reads, and
-// an outbound incident.io fetch.
-//
-// Two bounds protect the public endpoint:
-//   1. a short in-memory cache of the derived incident.io verdict, shared by
-//      every request an isolate serves;
-//   2. the Cloudflare Worker rate limit for trusted ingress and one fixed
-//      aggregate database bucket for direct callers, so direct traffic cannot
-//      mint rows. Trusted requests must not depend on the database limiter:
-//      this endpoint has to report maintenance while that database is offline.
-// The uptime probe polls this endpoint every ~15-20s. At a 20s TTL the cache
-// expired at roughly the probe interval and, being per-isolate, most requests
-// missed it and made a live incident.io call inside the request path. 120s
-// keeps that outbound call off the large majority of requests; incident.io ->
-// Slack remains the real-time alerting path, so a status payload up to two
-// minutes stale here costs nothing operationally.
-const INCIDENT_CACHE_TTL_MS = 120_000;
-// Keep the optional Incident.io dependency below the browser's 3.5s status
-// probe deadline. A slow widget should degrade the incident check, not make
-// the whole health request look like a client-side network timeout.
-const INCIDENT_FETCH_TIMEOUT_MS = 2_000;
+// the origin directly. Explicit maintenance and kill-switch state is owned by
+// the Cloudflare Worker; this endpoint reports database health and manual
+// status overrides only, with no external incident-provider dependency.
 const STATUS_RATE_LIMIT_PER_MINUTE = 60;
 const STATUS_RATE_LIMIT_WINDOW_SECONDS = 60;
 const STATUS_DIRECT_GLOBAL_LIMIT_PER_MINUTE = 600;
-
-type CachedIncidentStatus = {
-  status: "operational" | "degraded" | "down";
-  summary: string;
-  check: "ok" | "warn" | "unavailable";
-  fetchedAt: number;
-};
-
-let cachedIncidentStatus: CachedIncidentStatus | null = null;
-
-const readCachedIncidentStatus = () =>
-  cachedIncidentStatus &&
-    Date.now() - cachedIncidentStatus.fetchedAt < INCIDENT_CACHE_TTL_MS
-    ? cachedIncidentStatus
-    : null;
-
-const resolveIncidentStatus = (
-  payload: IncidentWidgetPayload
-): { status: "operational" | "degraded" | "down"; summary: string } => {
-  const ongoing = payload.ongoing_incidents ?? [];
-  const inProgressMaintenances = payload.in_progress_maintenances ?? [];
-  const scheduledMaintenances = payload.scheduled_maintenances ?? [];
-
-  const impacts: IncidentImpact[] = [];
-
-  for (const incident of ongoing) {
-    if (incident.current_worst_impact) {
-      impacts.push(incident.current_worst_impact);
-    }
-    for (const component of incident.affected_components ?? []) {
-      if (component.current_status) {
-        impacts.push(component.current_status);
-      }
-    }
-  }
-
-  if (impacts.includes("full_outage")) {
-    return { status: "down", summary: "incident full outage" as const };
-  }
-
-  if (
-    ongoing.length > 0 ||
-    impacts.includes("partial_outage") ||
-    impacts.includes("degraded_performance") ||
-    inProgressMaintenances.length > 0
-  ) {
-    return { status: "degraded", summary: "active incident or maintenance" as const };
-  }
-
-  if (scheduledMaintenances.length > 0) {
-    return { status: "operational", summary: "scheduled maintenance" as const };
-  }
-
-  return { status: "operational", summary: "no active incidents" as const };
-};
 
 serve((req) => withRequestSpan(req, "GET /functions/system-status", async (span, requestId) => {
   const { hasOrigin, originAllowed, headers } = resolveCorsHeaders(req, corsHeaders);
@@ -169,7 +74,6 @@ serve((req) => withRequestSpan(req, "GET /functions/system-status", async (span,
   const startedAt = Date.now();
   const supabaseUrl = Deno.env.get("ITX_SUPABASE_URL") ?? Deno.env.get("SUPABASE_URL");
   const serviceKey = Deno.env.get("ITX_SECRET_KEY") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  const incidentWidgetUrl = Deno.env.get("ITX_INCIDENT_IO_WIDGET_URL");
   const killSwitchMessage = resolveKillSwitchMessage();
 
   if (!supabaseUrl || !serviceKey) {
@@ -236,9 +140,8 @@ serve((req) => withRequestSpan(req, "GET /functions/system-status", async (span,
       }
     }
 
-    let incidentStatus: "operational" | "degraded" | "down" = "operational";
-    let incidentSummary = "not configured";
-    let incidentCheck: "ok" | "warn" | "unavailable" = "unavailable";
+    let status: "operational" | "degraded" | "down" = "operational";
+    let incidentSummary = "all systems operational";
     const killSwitchActive = isKillSwitchEnabled() && !isLocalhostBypassRequest(req);
     let broadcast: {
       enabled: boolean;
@@ -246,66 +149,6 @@ serve((req) => withRequestSpan(req, "GET /functions/system-status", async (span,
       level: "info" | "warning" | "critical";
       updated_at: string;
     } | null = null;
-
-    // Check Incident.io independently of database-backed config. Run both
-    // reads concurrently to stay inside the browser's transport deadline
-    // when either service is slow.
-    const incidentStatusPromise = (async () => {
-      try {
-        const cachedIncident = readCachedIncidentStatus();
-        if (incidentWidgetUrl && cachedIncident) {
-          return cachedIncident;
-        }
-        if (!incidentWidgetUrl) {
-          return {
-            status: "operational" as const,
-            summary: "not configured",
-            check: "unavailable" as const,
-            fetchedAt: Date.now(),
-          };
-        }
-
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), INCIDENT_FETCH_TIMEOUT_MS);
-        let response: Response;
-        try {
-          response = await fetch(incidentWidgetUrl, {
-            method: "GET",
-            headers: { Accept: "application/json" },
-            signal: controller.signal,
-          });
-        } finally {
-          clearTimeout(timeoutId);
-        }
-
-        if (!response.ok) {
-          throw new Error(`Incident widget request failed (${response.status})`);
-        }
-
-        const payload = (await response.json()) as IncidentWidgetPayload;
-        const mapped = resolveIncidentStatus(payload);
-        const result: CachedIncidentStatus = {
-          status: mapped.status,
-          summary: mapped.summary,
-          check: mapped.status === "operational" ? "ok" : "warn",
-          fetchedAt: Date.now(),
-        };
-        cachedIncidentStatus = result;
-        return result;
-      } catch (error) {
-        // Cache the failure too, so an incident.io outage does not turn into a
-        // per-request outbound retry storm.
-        const result: CachedIncidentStatus = {
-          status: "operational",
-          summary: "incident source unavailable",
-          check: "unavailable",
-          fetchedAt: Date.now(),
-        };
-        cachedIncidentStatus = result;
-        console.error("system-status incident.io fetch failed:", error);
-        return result;
-      }
-    })();
 
     const configPromise = Promise.all([
       adminClient
@@ -315,50 +158,33 @@ serve((req) => withRequestSpan(req, "GET /functions/system-status", async (span,
         .maybeSingle(),
       adminClient
         .from("app_runtime_config")
-        .select("value, updated_at")
-        .eq("key", "maintenance_mode")
-        .maybeSingle(),
-      adminClient
-        .from("app_runtime_config")
         .select("value")
         .eq("key", "system_status_override")
         .maybeSingle(),
     ]);
 
-    const [incidentResult, configResults] = await Promise.all([
-      incidentStatusPromise,
-      configPromise,
-    ]);
-    const [broadcastResult, maintenanceResult, systemStatusOverrideResult] = configResults;
-    incidentStatus = incidentResult.status;
-    incidentSummary = incidentResult.summary;
-    incidentCheck = incidentResult.check;
+    const configResults = await configPromise;
+    const [broadcastResult, systemStatusOverrideResult] = configResults;
     const { data: broadcastRow, error: broadcastError } = broadcastResult;
-    const { data: maintenanceRow, error: maintenanceError } = maintenanceResult;
     const { data: systemStatusOverrideRow, error: systemStatusOverrideError } =
       systemStatusOverrideResult;
 
-    // These three reads are the database liveness check. A dedicated
-    // `profiles` count used to run sequentially ahead of them for the same
-    // purpose, which cost a full extra round trip on every request. Every
-    // query failing is what "the database is unreachable" looks like; a single
-    // failure is a per-key problem and is handled by the readers below, which
-    // already tolerate a missing row.
-    if (broadcastError && maintenanceError && systemStatusOverrideError) {
+    // If both config reads fail, report database unavailability. A missing
+    // individual key is tolerated by its reader below.
+    if (broadcastError && systemStatusOverrideError) {
       console.error(JSON.stringify({
         evt: "system_status_db_unavailable",
         request_id: requestId,
-        error_code: maintenanceError.code ?? null,
-        error_message: maintenanceError.message ?? null,
+        error_code: systemStatusOverrideError.code ?? null,
+        error_message: systemStatusOverrideError.message ?? null,
       }));
       return jsonResponse(503, {
         status: "down",
         checks: {
           config: "ok",
           db: "failed",
-          incident_io: incidentCheck,
         },
-        incident_summary: incidentSummary,
+        incident_summary: "system status config unavailable",
         kill_switch: {
           enabled: killSwitchActive,
           message: killSwitchMessage,
@@ -366,27 +192,6 @@ serve((req) => withRequestSpan(req, "GET /functions/system-status", async (span,
         duration_ms: Date.now() - startedAt,
         checked_at: new Date().toISOString(),
       });
-    }
-
-    let maintenance: {
-      enabled: boolean;
-      message: string;
-      updated_at: string;
-    } | null = null;
-
-    if (maintenanceRow?.value && typeof maintenanceRow.value === "object") {
-      const value = maintenanceRow.value as Record<string, unknown>;
-      maintenance = {
-        enabled: value.enabled === true,
-        message:
-          typeof value.message === "string" && value.message.trim()
-            ? value.message.trim()
-            : "Maintenance in progress.",
-        updated_at:
-          typeof value.updated_at === "string" && value.updated_at
-            ? value.updated_at
-            : maintenanceRow.updated_at ?? new Date().toISOString(),
-      };
     }
 
     if (!broadcastError && broadcastRow?.value && typeof broadcastRow.value === "object") {
@@ -410,30 +215,26 @@ serve((req) => withRequestSpan(req, "GET /functions/system-status", async (span,
 
     const statusOverride = resolveSystemStatusOverride(systemStatusOverrideRow?.value);
     if (statusOverride) {
-      incidentStatus = statusOverride.status;
+      status = statusOverride.status;
       incidentSummary = statusOverride.summary;
-      incidentCheck = statusOverride.status === "operational" ? "ok" : "warn";
     }
 
     if (killSwitchActive) {
-      incidentStatus = "down";
+      status = "down";
       incidentSummary = "global killswitch enabled";
-      incidentCheck = "warn";
     }
 
     return jsonResponse(200, {
-      status: incidentStatus,
+      status,
       checks: {
         config: "ok",
         db: "ok",
-        incident_io: incidentCheck,
       },
       kill_switch: {
         enabled: killSwitchActive,
         message: killSwitchMessage,
       },
       broadcast,
-      maintenance,
       incident_summary: incidentSummary,
       duration_ms: Date.now() - startedAt,
       checked_at: new Date().toISOString(),

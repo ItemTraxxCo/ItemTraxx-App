@@ -31,7 +31,6 @@ type AuditRequest = {
 };
 
 serve(async (req) => {
-  const origin = req.headers.get("Origin");
   const { originAllowed, headers } = resolveCorsHeaders(req, BASE_CORS_HEADERS);
   const jsonResponse = (status: number, body: Record<string, unknown>) =>
     new Response(JSON.stringify(body), {

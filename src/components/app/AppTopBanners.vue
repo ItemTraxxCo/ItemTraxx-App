@@ -7,7 +7,12 @@
     aria-live="assertive"
   >
     <strong>Maintenance Mode</strong>
-    <span>{{ maintenanceMessage }}</span>
+    <span>
+      <template v-for="(part, index) in splitStatusPageMessage(maintenanceMessage)" :key="index">
+        <a v-if="part.isLink" class="status-page-inline-link" :href="statusPageUrl" target="_blank" rel="noreferrer">{{ part.text }}</a>
+        <template v-else>{{ part.text }}</template>
+      </template>
+    </span>
   </div>
   <slot />
   <div
@@ -45,7 +50,7 @@
     </div>
     <a
       class="broadcast-link"
-      href="https://status.itemtraxx.com/?ref=bcastlink"
+      :href="statusPageUrl"
       target="_blank"
       rel="noreferrer"
     >
@@ -60,6 +65,7 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, onMounted, onUpdated, ref } from "vue";
 import type { TopBannerElements } from "../../composables/useTopBannerLayout";
+import { splitStatusPageMessage, STATUS_PAGE_URL } from "../../utils/statusPageMessage";
 
 type BroadcastBanner = {
   message: string;
@@ -70,16 +76,19 @@ type IncidentBanner = {
   level: "degraded" | "down";
 };
 
-defineProps<{
+withDefaults(defineProps<{
   maintenanceVisible: boolean;
   maintenanceMessage: string;
+  statusPageUrl?: string;
   broadcast: BroadcastBanner | null;
   broadcastVisible: boolean;
   incident: IncidentBanner | null;
   incidentVisible: boolean;
   incidentTitle: string;
   incidentSlaLine: string;
-}>();
+}>(), {
+  statusPageUrl: STATUS_PAGE_URL,
+});
 
 const emit = defineEmits<{
   dismissBroadcast: [];
@@ -109,3 +118,11 @@ onBeforeUnmount(() => {
   emit("elements", { maintenance: null, broadcast: null, incident: null });
 });
 </script>
+
+<style scoped>
+.status-page-inline-link {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+</style>

@@ -104,6 +104,22 @@ describe("useIntercom", () => {
     scope.stop();
   });
 
+  it("forwards allowAnonymousFallback from downtime support open events", async () => {
+    const { scope } = mount(makeAuth({ isAuthenticated: true, userId: "u1", email: "a@b.co" }));
+    await flush();
+
+    window.dispatchEvent(
+      new CustomEvent("itemtraxx:open-support", { detail: { allowAnonymousFallback: true } }),
+    );
+    await flush();
+
+    expect(mocks.openIntercomMessenger).toHaveBeenCalledWith(
+      { userId: "u1", email: "a@b.co" },
+      { allowAnonymousFallback: true },
+    );
+    scope.stop();
+  });
+
   it("shuts the Messenger down and re-boots anonymously after sign-out", async () => {
     const auth = makeAuth({ isAuthenticated: true, userId: "u1" });
     const { scope } = mount(auth);

@@ -37,7 +37,6 @@ export type TenantNotificationPayload = {
     link_url: string | null;
   }>;
   feature_flags: TenantFeatureFlags;
-  maintenance: { enabled: boolean; message: string } | null;
   recent_status_events: StatusHistoryItem[];
 };
 

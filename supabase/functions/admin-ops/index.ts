@@ -22,7 +22,6 @@ import {
 } from "./actions/index.ts";
 import {
   normalizeWorkspaceUpdates,
-  resolveMaintenance,
 } from "./actions/notifications.ts";
 import {
   findActiveSession,
@@ -277,24 +276,13 @@ serve((req) => withRequestSpan(req, "POST /functions/admin-ops", async (span, re
     let workspacePolicy: Awaited<ReturnType<typeof resolveWorkspacePolicyState>>["workspacePolicy"] = null;
     let checkoutDueHours = 72;
     let featureFlags = defaultFeatureFlags();
-    let maintenance = resolveMaintenance(undefined);
     let workspaceUpdates = normalizeWorkspaceUpdates(undefined);
     if (!isSessionAction) {
-      const [maintenanceRuntimeResult, updateRuntimeResult] = await Promise.all([
-        adminClient
-          .from("app_runtime_config")
-          .select("value")
-          .eq("key", "maintenance_mode")
-          .maybeSingle(),
-        adminClient
-          .from("app_runtime_config")
-          .select("value")
-          .eq("key", "workspace_updates")
-          .maybeSingle(),
-      ]);
-      maintenance = resolveMaintenance(
-        maintenanceRuntimeResult.data?.value,
-      );
+      const updateRuntimeResult = await adminClient
+        .from("app_runtime_config")
+        .select("value")
+        .eq("key", "workspace_updates")
+        .maybeSingle();
 
       const resolvedPolicy = await resolveWorkspacePolicyState(
         adminClient,
@@ -332,7 +320,6 @@ serve((req) => withRequestSpan(req, "POST /functions/admin-ops", async (span, re
       workspacePolicy,
       checkoutDueHours,
       featureFlags,
-      maintenance,
       workspaceUpdates,
       jsonResponse,
     };

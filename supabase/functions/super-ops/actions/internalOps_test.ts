@@ -174,7 +174,6 @@ Deno.test("get_internal_ops_snapshot returns a full snapshot with traffic, queue
   ];
 
   const runtimeConfigRows = [
-    { key: "maintenance_mode", value: false },
     { key: "broadcast_message", value: null },
   ];
 
@@ -277,7 +276,6 @@ Deno.test("get_internal_ops_snapshot returns a full snapshot with traffic, queue
     data.search_index.some((e: any) => e.id === `tenant_${workspaceId}`),
     "search index tenant",
   );
-  assert(data.runtime.maintenance_mode === false, "runtime config");
   assert(data.recent_events.length === 3, "recent events length");
   assert(data.recent_events[0].item_name === "Chromebook 12", "item name resolved");
   assert(data.recent_events[0].borrower_username === "jdoe", "borrower resolved");

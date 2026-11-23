@@ -1,6 +1,6 @@
 # Changelog
 
-Last updated (year-month-day): 2026-07-28
+Last updated (year-month-day): 2026-09-10
 
 This changelog highlights major user-facing ItemTraxx updates.
 

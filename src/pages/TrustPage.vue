@@ -100,7 +100,7 @@ const trustLinks = [
     category: "Transparency",
     title: "Changelog",
     description: "Recent product, engineering, security, and operational changes documented publicly.",
-    to: "/changelog",
+    to: "/index/changelog",
   },
   {
     category: "Operations",

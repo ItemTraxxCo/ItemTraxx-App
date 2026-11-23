@@ -22,28 +22,24 @@
       <div class="admin-section-header">
         <div>
           <h2>Add Borrower</h2>
-          <p class="admin-section-copy">Generate a new borrower identity and add it to this tenant.</p>
+          <p class="admin-section-copy">Enter a name and borrower ID to add a borrower.</p>
         </div>
       </div>
       <form class="form" @submit.prevent="handleCreate">
-        <label>
-          Username
-          <input
-            v-model="usernamePreview"
-            type="text"
-            readonly
-            title="If you need to change this, contact support."
-          />
-        </label>
-        <label>
-          Borrower ID
-          <input
-            v-model="borrowerIdPreview"
-            type="text"
-            readonly
-            title="If you need to change this, contact support."
-          />
-        </label>
+        <fieldset class="name-mode-picker">
+          <legend>Name format</legend>
+          <div class="name-mode-track">
+            <label class="name-mode-option"><input v-model="nameMode" type="radio" name="borrower-name-format" value="split" /> First &amp; Last Name</label>
+            <label class="name-mode-option"><input v-model="nameMode" type="radio" name="borrower-name-format" value="free" /> Free Input</label>
+          </div>
+        </fieldset>
+        <template v-if="nameMode === 'split'">
+          <label>First Name <input v-model="firstName" type="text" maxlength="100" required /></label>
+          <label>Last Name <input v-model="lastName" type="text" maxlength="100" /></label>
+        </template>
+        <label v-else>Name / Identifier <input v-model="freeName" type="text" maxlength="100" required /></label>
+        <label>Borrower ID <input v-model="borrowerId" type="text" maxlength="32" pattern="[A-Za-z0-9]+" required /></label>
+        <label>Email <input v-model="email" type="email" maxlength="254" /></label>
         <TenantAccessPicker
           v-if="!isIndividualAccount"
           v-model:access-mode="accessMode"
@@ -51,7 +47,6 @@
           :accounts="tenantAccounts"
         />
         <div class="form-actions">
-          <button type="button" @click="regenerateIdentity">Regenerate</button>
           <button type="submit" class="button-primary" :disabled="isSaving">Add borrower</button>
         </div>
       </form>
@@ -95,7 +90,7 @@
           <input
             v-model="searchQuery"
             type="text"
-            placeholder="Search by username or borrower ID"
+            placeholder="Search by name, borrower ID, or email"
           />
         </label>
       </div>
@@ -137,7 +132,7 @@
                     aria-label="Select all borrowers"
                   />
                 </th>
-                <th>Username</th>
+                <th>Name</th>
                 <th>Borrower ID</th>
                 <th v-if="!isIndividualAccount">Tenant Accounts</th>
                 <th>Details</th>
@@ -150,10 +145,10 @@
                     type="checkbox"
                     :checked="selectedBorrowerIds.has(item.id)"
                     @click="toggleBorrowerSelection(item.id, index, $event)"
-                    :aria-label="`Select ${item.username}`"
+                    :aria-label="`Select ${borrowerDisplayName(item)}`"
                   />
                 </td>
-                <td data-session-replay-mask>{{ item.username }}</td>
+                <td data-session-replay-mask>{{ borrowerDisplayName(item) }}</td>
                 <td data-session-replay-mask>{{ item.borrower_id }}</td>
                 <td v-if="!isIndividualAccount">
                   <span class="scoped-accounts-cell" data-session-replay-mask :title="scopedAccountsTitle(item)">
@@ -199,14 +194,14 @@
           <table class="table">
             <thead>
               <tr>
-                <th>Username</th>
+                <th>Name</th>
                 <th>Borrower ID</th>
                 <th></th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="item in filteredArchivedBorrowers" :key="item.id">
-                <td data-session-replay-mask>{{ item.username }}</td>
+                <td data-session-replay-mask>{{ borrowerDisplayName(item) }}</td>
                 <td data-session-replay-mask>{{ item.borrower_id }}</td>
                 <td>
                   <button type="button" class="link" :disabled="isSaving" @click="handleRestore(item)">
@@ -221,39 +216,6 @@
           </table>
         </div>
       </BoneyardSkeleton>
-    </div>
-
-    <div v-if="featureFlags.enable_bulk_borrower_tools" class="card admin-section-card">
-      <div class="admin-section-header">
-        <div>
-          <h2>Bulk Borrower Tools</h2>
-          <p class="admin-section-copy">Generate identities in bulk and import them in one action.</p>
-        </div>
-      </div>
-      <div class="form-grid-2">
-        <label>
-          Generate count
-          <input v-model.number="bulkGenerateCount" type="number" min="1" max="200" />
-        </label>
-      </div>
-      <div class="form-actions">
-        <button type="button" @click="generateBulkRows">Generate identities</button>
-      </div>
-
-      <div class="form-actions">
-        <button
-          type="button"
-          class="button-primary bulk-import-button"
-          :disabled="isSaving || bulkRows.length === 0"
-          @click="runBulkImport"
-        >
-          Import Generated Rows
-        </button>
-      </div>
-
-      <p class="muted" v-if="bulkRows.length">
-        Generated rows ready: {{ bulkRows.length }}
-      </p>
     </div>
 
     <div v-if="!isIndividualAccount && showBulkAccessModal" class="modal-backdrop">
@@ -277,8 +239,8 @@
     <div v-if="showDetails" class="modal-backdrop">
       <div class="modal">
         <h2>Borrower details</h2>
-        <p class="muted">View username, borrower ID, and checkout history.</p>
-        <h3 data-session-replay-mask>{{ selected?.username }}</h3>
+        <p class="muted">View name, borrower ID, and checkout history.</p>
+        <h3 data-session-replay-mask>{{ selected ? borrowerDisplayName(selected) : "" }}</h3>
         <p class="muted">Borrower ID: <span data-session-replay-mask>{{ selected?.borrower_id }}</span></p>
         <p v-if="selected && !isIndividualAccount" class="muted">
           Tenant Accounts:
@@ -335,7 +297,6 @@ import SkeletonLoader from "../../../components/SkeletonLoader.vue";
 import TenantAccessPicker from "../../../components/app/TenantAccessPicker.vue";
 import { getAuthState } from "../../../store/authState";
 import {
-  bulkCreateBorrowers,
   createBorrower,
   deleteBorrower,
   fetchDeletedBorrowers,
@@ -347,9 +308,8 @@ import {
   type BorrowerDetails,
   type BorrowerItem,
 } from "../../../services/borrowerService";
-import { fetchWorkspaceSettings } from "../../../services/adminOpsService";
 import { exportRowsToCsv, exportRowsToPdf } from "../../../services/exportService";
-import { generateBorrowerIdentity } from "../../../utils/borrowerIdentity";
+import { borrowerDisplayName, sortBorrowersByName, normalizeBorrowerName } from "../../../utils/borrowerName";
 import { listTenantAccounts } from "../../../services/workspaceAdminManageService";
 import { useManagerContext } from "../../../composables/useManagerContext";
 
@@ -371,21 +331,16 @@ const toastMessage = ref("");
 const toastActionLabel = ref("");
 const toastAction = ref<(() => Promise<void>) | null>(null);
 
-const usernamePreview = ref("");
-const borrowerIdPreview = ref("");
+const nameMode = ref<"split" | "free">("split");
+const firstName = ref("");
+const lastName = ref("");
+const freeName = ref("");
+const borrowerId = ref("");
+const email = ref("");
 const accessMode = ref<"" | "all" | "restricted">(isIndividualAccount.value ? "all" : "");
 const selectedProfileIds = ref<string[]>([]);
 const tenantAccounts = ref<Array<{id:string;auth_email:string}>>([]);
 const searchQuery = ref("");
-const featureFlags = ref({
-  enable_notifications: true,
-  enable_bulk_item_import: true,
-  enable_bulk_borrower_tools: true,
-  enable_status_tracking: true,
-  enable_barcode_generator: true,
-});
-const bulkGenerateCount = ref(20);
-const bulkRows = ref<Array<{ username: string; borrower_id: string }>>([]);
 const bulkMode = ref(
   import.meta.env.VITE_E2E_TEST_UTILS === "true" &&
     new URLSearchParams(window.location.search).get("boneyard-bulk") === "true"
@@ -395,9 +350,9 @@ const lastSelectedIndex = ref<number | null>(null);
 const showBulkAccessModal = ref(false);
 const bulkAccessMode = ref<"" | "all" | "restricted">("");
 const bulkAccessProfileIds = ref<string[]>([]);
-const borrowerFixtureHeaders = ["Username", "Borrower ID", "Tenant Accounts", "Details"];
+const borrowerFixtureHeaders = ["Name", "Borrower ID", "Tenant Accounts", "Details"];
 const borrowerBulkFixtureHeaders = ["Select", ...borrowerFixtureHeaders];
-const archivedBorrowerFixtureHeaders = ["Username", "Borrower ID", ""];
+const archivedBorrowerFixtureHeaders = ["Name", "Borrower ID", ""];
 const isBoneyardCapture =
   import.meta.env.VITE_E2E_TEST_UTILS === "true" &&
   new URLSearchParams(window.location.search).has("boneyard");
@@ -405,18 +360,18 @@ let toastTimer: number | null = null;
 
 const matchesSearch = (item: BorrowerItem, query: string) => {
   if (!query) return true;
-  const haystack = `${item.username} ${item.borrower_id}`.toLowerCase();
+  const haystack = `${borrowerDisplayName(item)} ${item.borrower_id} ${item.email ?? ""}`.toLowerCase();
   return haystack.includes(query);
 };
 
 const filteredBorrowers = computed(() => {
   const query = searchQuery.value.trim().toLowerCase();
-  return borrowers.value.filter((item) => matchesSearch(item, query));
+  return sortBorrowersByName(borrowers.value.filter((item) => matchesSearch(item, query)));
 });
 
 const filteredArchivedBorrowers = computed(() => {
   const query = searchQuery.value.trim().toLowerCase();
-  return archivedBorrowers.value.filter((item) => matchesSearch(item, query));
+  return sortBorrowersByName(archivedBorrowers.value.filter((item) => matchesSearch(item, query)));
 });
 
 const allFilteredSelected = computed(
@@ -547,19 +502,13 @@ const runToastAction = async () => {
   await action();
 };
 
-const showDuplicateBorrowerToast = () => {
-  showToast(
-    "Unable to add borrower.",
-    "Check borrower ID number and make sure it does not match another borrower's ID number. If you believe this is an error, contact support with the current borrower details and the details you want to add."
-  );
-};
-
 const loadArchivedBorrowers = async () => {
   isLoadingArchived.value = true;
   try {
     archivedBorrowers.value = await fetchDeletedBorrowers();
-  } catch {
+  } catch (err) {
     archivedBorrowers.value = [];
+    error.value = err instanceof Error ? err.message : "Unable to load archived borrowers.";
   } finally {
     isLoadingArchived.value = false;
   }
@@ -619,51 +568,14 @@ const loadBorrowers = async () => {
   await loadArchivedBorrowers();
 };
 
-const regenerateIdentity = () => {
-  const next = generateBorrowerIdentity();
-  usernamePreview.value = next.username;
-  borrowerIdPreview.value = next.borrowerId;
-};
-
-const generateBulkRows = () => {
-  const count = Math.min(200, Math.max(1, Math.round(Number(bulkGenerateCount.value) || 0)));
-  bulkGenerateCount.value = count;
-  bulkRows.value = Array.from({ length: count }, () => generateBorrowerIdentity()).map((row) => ({
-    username: row.username,
-    borrower_id: row.borrowerId,
-  }));
-};
-
-const runBulkImport = async () => {
-  if (!bulkRows.value.length) {
-    showToast("No rows to import.", "Generate rows first.");
-    return;
-  }
-  error.value = "";
-  success.value = "";
-  isSaving.value = true;
-  try {
-    const result = await bulkCreateBorrowers(bulkRows.value);
-    borrowers.value = [...result.inserted, ...borrowers.value];
-    success.value = `Imported ${result.inserted_count} borrower(s).`;
-    showToast("Bulk import complete", `Imported ${result.inserted_count}, skipped ${result.skipped_count}.`);
-    bulkRows.value = [];
-  } catch (err) {
-    error.value = err instanceof Error ? err.message : "Unable to import borrowers. Please try again. If the issue persists, contact support.";
-    showToast("Import failed", error.value);
-  } finally {
-    isSaving.value = false;
-  }
-};
-
 const exportRows = computed(() =>
-  filteredBorrowers.value.map((item) => ({ ...item, tenant_accounts: scopedAccountsLabel(item) }))
+  filteredBorrowers.value.map((item) => ({ ...item, name: borrowerDisplayName(item), tenant_accounts: scopedAccountsLabel(item) }))
 );
 
 const exportCsv = () => {
   exportRowsToCsv(
     `borrowers-${new Date().toISOString().slice(0, 10)}.csv`,
-    ["username", "borrower_id", "tenant_accounts"],
+    ["name", "borrower_id", "tenant_accounts"],
     exportRows.value
   );
 };
@@ -672,7 +584,7 @@ const exportPdf = async () => {
   await exportRowsToPdf(
     `borrowers-${new Date().toISOString().slice(0, 10)}.pdf`,
     "Borrower Export",
-    ["username", "borrower_id", "tenant_accounts"],
+    ["name", "borrower_id", "tenant_accounts"],
     exportRows.value
   );
 };
@@ -690,44 +602,37 @@ const handleCreate = async () => {
 
   isSaving.value = true;
   try {
+    const names = normalizeBorrowerName(nameMode.value === "split" ? firstName.value : freeName.value, nameMode.value === "split" ? lastName.value : "");
+    const cleanId = borrowerId.value.trim();
+    if (!/^[A-Za-z0-9]{1,32}$/.test(cleanId)) throw new Error("Enter an alphanumeric borrower ID.");
     const created = await createBorrower({
       workspace_id: auth.workspaceContextId,
-      username: usernamePreview.value,
-      borrower_id: borrowerIdPreview.value,
+      ...names,
+      email: email.value.trim() || null,
+      borrower_id: cleanId,
       access_mode: isIndividualAccount.value ? "all" : accessMode.value,
       profile_ids: isIndividualAccount.value ? [] : selectedProfileIds.value,
     });
     borrowers.value = [created, ...borrowers.value];
-    usernamePreview.value = created.username;
-    borrowerIdPreview.value = created.borrower_id;
-    regenerateIdentity();
+    firstName.value = "";
+    lastName.value = "";
+    freeName.value = "";
+    borrowerId.value = "";
+    email.value = "";
     accessMode.value = isIndividualAccount.value ? "all" : "";
     selectedProfileIds.value = [];
     success.value = "Borrower added.";
   } catch (err) {
     error.value = err instanceof Error ? err.message : "Unable to create borrower. Please try again. If the issue persists, contact support.";
-    showDuplicateBorrowerToast();
+    showToast("Unable to add borrower.", error.value);
   } finally {
     isSaving.value = false;
   }
 };
 
 onMounted(() => {
-  regenerateIdentity();
   if (isBoneyardCapture) return;
   void (async () => {
-    try {
-      const settings = await fetchWorkspaceSettings();
-      featureFlags.value = settings.feature_flags;
-    } catch {
-      featureFlags.value = {
-        enable_notifications: true,
-        enable_bulk_item_import: true,
-        enable_bulk_borrower_tools: true,
-        enable_status_tracking: true,
-        enable_barcode_generator: true,
-      };
-    }
     await loadBorrowers();
     if (!isIndividualAccount.value) {
       try {
@@ -779,7 +684,7 @@ const formatTime = (value: string) => {
 };
 
 const removeBorrower = async (item: BorrowerItem) => {
-  const confirmed = window.confirm(`Archive borrower "${item.username}"? You can restore them later if needed.`);
+  const confirmed = window.confirm(`Archive borrower "${borrowerDisplayName(item)}"? You can restore them later if needed.`);
   if (!confirmed) return;
   error.value = "";
   success.value = "";
@@ -791,7 +696,7 @@ const removeBorrower = async (item: BorrowerItem) => {
     success.value = "Borrower archived.";
     showToastWithAction(
       "Borrower archived",
-      `${item.username} was archived.`,
+      `${borrowerDisplayName(item)} was archived.`,
       "Undo",
       async () => {
         await handleRestore(item);
@@ -837,6 +742,61 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+.name-mode-picker {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.name-mode-picker legend {
+  margin-bottom: 0.4rem;
+  padding: 0;
+  font-weight: 600;
+}
+
+.name-mode-track {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  padding: 0.25rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+
+.name-mode-picker .name-mode-option {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 0.55rem 0.8rem;
+  border-radius: 7px;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  text-align: center;
+  cursor: pointer;
+}
+
+.name-mode-option:has(input:checked) {
+  background: var(--surface);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+}
+
+.name-mode-option:has(input:focus-visible) {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+.name-mode-option input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  opacity: 0;
+}
+
 .modal-backdrop {
   position: fixed;
   inset: 0;
@@ -888,10 +848,5 @@ onUnmounted(() => {
   background: var(--surface-2);
 }
 
-.bulk-import-button:disabled {
-  background-color: var(--surface-3);
-  border-color: var(--border);
-  color: var(--muted);
-  cursor: not-allowed;
-}
+
 </style>

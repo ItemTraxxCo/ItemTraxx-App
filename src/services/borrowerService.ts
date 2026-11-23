@@ -8,6 +8,10 @@ export type BorrowerItem = {
   id: string;
   workspace_id: string;
   username: string;
+  first_name?: string | null;
+  last_name?: string | null;
+  display_name?: string;
+  email?: string | null;
   borrower_id: string;
   access_mode?: "all" | "restricted";
 };
@@ -20,6 +24,7 @@ export type BorrowerDetails = {
 
 type MaybeRelation<T> = T | T[] | null;
 const ADMIN_LIST_PAGE_SIZE = 500;
+const encryptedDirectoryPreview = () => import.meta.env.DEV && import.meta.env.VITE_ENCRYPTED_BORROWERS_LOCAL === "true";
 const ACCESS_GRANT_BATCH_SIZE = 100;
 
 const pickRelation = <T>(value: MaybeRelation<T>): T | null => {
@@ -44,7 +49,8 @@ export const fetchBorrowers = async () => {
   const rows: BorrowerItem[] = [];
   let page = 0;
   while (true) {
-    const result = await fetchBorrowerPage(page, ADMIN_LIST_PAGE_SIZE);
+    const result = await fetchBorrowerPage(page, encryptedDirectoryPreview() ? 50 : ADMIN_LIST_PAGE_SIZE);
+    if (encryptedDirectoryPreview() && rows.length + result.rows.length > 10000) throw new Error("Encrypted borrower directory exceeds the local preview limit.");
     rows.push(...result.rows);
     if (!result.hasMore) return rows;
     page += 1;
@@ -57,6 +63,15 @@ export const fetchBorrowerPage = async (
   order = "created_at.desc",
 ) => {
   const workspaceId = getWorkspaceContextId();
+  if (encryptedDirectoryPreview()) {
+    if (pageSize > 50) throw new Error("Encrypted borrower pages are limited to 50 records.");
+    const { deviceId } = getOrCreateDeviceSession();
+    const response = await invokeEdgeFunction<{ data: { rows: BorrowerItem[]; hasMore: boolean } }>("crypto-broker", {
+      method: "POST", body: { action: "list", page, page_size: pageSize, device_id: deviceId },
+    });
+    if (!response.ok || !response.data?.data) throw edgeFunctionError(response, "Unable to load encrypted borrowers.");
+    return response.data.data;
+  }
   return authenticatedSelectPage<BorrowerItem>("borrowers", {
     select: "id,workspace_id,username,borrower_id,access_mode",
     workspace_id: `eq.${workspaceId}`,
@@ -82,6 +97,18 @@ export const fetchBorrowerAccessGrants = async (borrowerIds: string[]) => {
 
 export const fetchDeletedBorrowers = async () => {
   const { deviceId } = getOrCreateDeviceSession();
+  if (encryptedDirectoryPreview()) {
+    const rows: BorrowerItem[] = [];
+    for (let page = 0; ; page++) {
+      const response = await invokeEdgeFunction<{ data: { rows: BorrowerItem[]; hasMore: boolean } }>("crypto-broker", {
+        method: "POST", body: { action: "list", archived: true, page, page_size: 50, device_id: deviceId },
+      });
+      if (!response.ok || !response.data?.data) throw edgeFunctionError(response, "Unable to load archived borrowers.");
+      if (rows.length + response.data.data.rows.length > 10000) throw new Error("Encrypted borrower directory exceeds the local preview limit.");
+      rows.push(...response.data.data.rows);
+      if (!response.data.data.hasMore) return rows;
+    }
+  }
   const result = await invokeEdgeFunction<{ data: BorrowerItem[] }>(
     "admin-borrower-mutate",
     {
@@ -103,11 +130,25 @@ export const fetchDeletedBorrowers = async () => {
 export const createBorrower = async (payload: {
   workspace_id: string;
   username?: string;
+  first_name?: string;
+  last_name?: string | null;
+  email?: string | null;
   borrower_id?: string;
   access_mode: "all" | "restricted";
   profile_ids: string[];
 }) => {
   const { deviceId } = getOrCreateDeviceSession();
+  if (payload.first_name !== undefined) {
+    const result = await invokeEdgeFunction<{ data: BorrowerItem }>("crypto-broker", {
+      method: "POST", body: { action: "create", device_id: deviceId, payload: {
+        first_name: payload.first_name, last_name: payload.last_name ?? null,
+        borrower_id: payload.borrower_id ?? "", email: payload.email ?? null,
+        access_mode: payload.access_mode, profile_ids: payload.profile_ids,
+      } },
+    });
+    if (!result.ok || !result.data?.data) throw edgeFunctionError(result, "Unable to create borrower.");
+    return result.data.data;
+  }
   const result = await invokeEdgeFunction<{ data: BorrowerItem }>(
     "admin-borrower-mutate",
     {
@@ -208,6 +249,13 @@ export const deleteBorrower = async (id: string) => {
 
 export const restoreBorrower = async (id: string) => {
   const { deviceId } = getOrCreateDeviceSession();
+  if (encryptedDirectoryPreview()) {
+    const response = await invokeEdgeFunction<{ data: BorrowerItem }>("crypto-broker", {
+      method: "POST", body: { action: "restore", id, device_id: deviceId },
+    });
+    if (!response.ok || !response.data?.data) throw edgeFunctionError(response, "Unable to restore borrower.");
+    return response.data.data;
+  }
   const result = await invokeEdgeFunction<{ data: BorrowerItem }>(
     "admin-borrower-mutate",
     {

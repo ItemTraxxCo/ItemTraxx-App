@@ -9,11 +9,13 @@ import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 import { validateAccountDeviceSession } from "../_shared/accountSessions.ts";
 import { resolveWorkspaceAccess } from "../_shared/workspaceAccess.ts";
 import {
+  optionalText,
   requireText,
   optionalText,
   BORROWER_ID_PATTERN,
   ValidationError,
 } from "../_shared/validation.ts";
+import { hashBorrowerId, decryptBorrower } from "../_shared/encryptedBorrower.ts";
 import { logError, withRequestSpan } from "../_shared/observability.ts";
 
 const baseCorsHeaders = {
@@ -137,27 +139,33 @@ serve((req) => withRequestSpan(req, "POST /functions/checkout-borrower-lookup", 
     const activeSession = await validateAccountDeviceSession(adminClient,{workspaceId:profile.workspace_id,profileId:authData.user.id,deviceId,authToken});
     if(activeSession.relationMissing)return jsonResponse(503,{error:"Session controls unavailable"});
     if(!activeSession.valid)return jsonResponse(401,{error:"Session revoked"});
-    const borrowerId = requireText(body.borrower_id, {
-      maxLen: 6,
-      pattern: BORROWER_ID_PATTERN,
-      transform: "uppercase",
+    const encryptedMode = Deno.env.get("ITX_ENCRYPTED_BORROWERS_LOCAL") === "true";
+    const borrowerId = requireText(body.borrower_id, encryptedMode ? { maxLen: 32 } : {
+      maxLen: 6, pattern: BORROWER_ID_PATTERN, transform: "uppercase",
     });
-    const { data: borrower, error: borrowerError } = await adminClient
+    const gatewaySecret = Deno.env.get("ITX_SGW_INTERNAL_SECRET") ?? "";
+    const lookupValue = encryptedMode ? await hashBorrowerId(profile.workspace_id, borrowerId, gatewaySecret) : borrowerId;
+    const { data: borrowerResult, error: borrowerError } = await adminClient
       .from("borrowers")
-      .select("id, username, borrower_id, access_mode")
+      .select(encryptedMode ? "id, encrypted_data, nonce, auth_tag, key_version, access_mode" : "id, username, borrower_id, access_mode")
       .eq("workspace_id", profile.workspace_id)
-      .eq("borrower_id", borrowerId)
+      .eq(encryptedMode ? "borrower_id_hash" : "borrower_id", lookupValue)
       .is("deleted_at", null)
       .maybeSingle();
     if (borrowerError) {
       return jsonResponse(500, { error: "Borrower lookup failed" });
     }
+    const borrower = borrowerResult as unknown as { id: string; access_mode: string; encrypted_data: string | null; nonce: string | null; auth_tag: string | null; key_version: number | null } | null;
     if (!borrower) return jsonResponse(404, { error: "Borrower not found" });
     if (profile.role === "tenant_account" && borrower.access_mode === "restricted") {
       const { data: grant } = await adminClient.from("borrower_access_grants").select("borrower_id").eq("borrower_id", borrower.id).eq("profile_id", authData.user.id).maybeSingle();
       // Deliberately the same 404 as an unknown borrower: a caller without a grant must
       // not be able to tell a restricted borrower apart from one that does not exist.
       if (!grant) return jsonResponse(404, { error: "Borrower not found" });
+    }
+    if (encryptedMode) {
+      const payload = await decryptBorrower(profile.workspace_id, borrower, gatewaySecret);
+      return jsonResponse(200, { data: { id: borrower.id, access_mode: borrower.access_mode, ...payload } });
     }
     return jsonResponse(200, { data: borrower });
   } catch (error) {

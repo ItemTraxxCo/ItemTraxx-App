@@ -147,9 +147,15 @@ export const initializeIntercom = async (user?: IntercomUser | null) => {
  * Boots the Messenger on demand (anonymous unless a user is supplied) and
  * opens it. Returns false when Intercom is not configured or failed to boot.
  */
-export const openIntercomMessenger = async (user?: IntercomUser | null) => {
+export const openIntercomMessenger = async (
+  user?: IntercomUser | null,
+  options?: { allowAnonymousFallback?: boolean },
+) => {
   if (!isIntercomConfigured()) return false;
   if (!activeIdentity) await initializeIntercom(user ?? null);
+  if (!activeIdentity && user && options?.allowAnonymousFallback) {
+    await initializeIntercom(null);
+  }
   if (!activeIdentity) return false;
 
   try {

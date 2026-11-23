@@ -30,8 +30,6 @@ type RateLimitResult = {
   retry_after_seconds: number | null;
 };
 
-const lower = (value: string | null | undefined) => (value ?? "").toLowerCase();
-
 const resolveResetRedirectTo = () => {
   const configured = (Deno.env.get("ITX_PASSWORD_RESET_REDIRECT_URL") ?? "").trim();
   if (configured) return configured;

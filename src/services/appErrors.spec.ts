@@ -183,7 +183,7 @@ describe("toUserFacingErrorMessage", () => {
   });
 
   it("pattern-matches plain Error messages the same way as AppError codes", () => {
-    expect(toUserFacingErrorMessage(new Error("Unauthorized"), fallback)).toMatch(/session has  expired/i);
+    expect(toUserFacingErrorMessage(new Error("Unauthorized"), fallback)).toMatch(/session has expired/i);
     expect(toUserFacingErrorMessage(new Error("Network request failed"), fallback)).toMatch(/unable to reach ItemTraxx servers/i);
     expect(toUserFacingErrorMessage(new Error("Request timed out"), fallback)).toMatch(/timed out/i);
     expect(toUserFacingErrorMessage(new Error("Too many requests"), fallback)).toMatch(/too many requests/i);

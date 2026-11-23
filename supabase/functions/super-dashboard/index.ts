@@ -198,7 +198,8 @@ serve((req) => withRequestSpan(req, "GET /functions/super-dashboard", async (spa
 
     const [runtimeResult, alertRulesResult, approvalsResult, jobsResult] =
       await Promise.all([
-        adminClient.from("app_runtime_config").select("key, value"),
+        adminClient.from("app_runtime_config").select("key, value")
+          .neq("key", "maintenance_mode"),
         adminClient
           .from("super_alert_rules")
           .select("id, name, metric_key, threshold, is_enabled")

@@ -104,4 +104,23 @@ describe("intercomService", () => {
     ).resolves.toBe(false);
     expect(mocks.showSdk).not.toHaveBeenCalled();
   });
+
+  it("falls back to anonymous Messenger when allowAnonymousFallback is enabled during downtime", async () => {
+    mocks.invokeEdgeFunction.mockResolvedValueOnce({
+      ok: false,
+      status: 503,
+      data: null,
+      error: "Service unavailable.",
+    });
+    const service = await loadService();
+
+    await expect(
+      service.openIntercomMessenger(
+        { userId: "user-123", email: "person@example.com" },
+        { allowAnonymousFallback: true },
+      ),
+    ).resolves.toBe(true);
+    expect(mocks.initializeSdk).toHaveBeenCalledWith({ app_id: "p7kap9jy" });
+    expect(mocks.showSdk).toHaveBeenCalledTimes(1);
+  });
 });

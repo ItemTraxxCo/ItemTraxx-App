@@ -5,11 +5,6 @@ export const EDGE_PROXY_TIMESTAMP_HEADER = "x-itx-edge-proxy-ts";
 export const EDGE_PROXY_SIGNATURE_HEADER = "x-itx-edge-proxy-signature";
 export const EDGE_PROXY_BODY_HASH_HEADER = "x-itx-edge-proxy-body-sha256";
 
-export const DEFAULT_KILL_SWITCH_MESSAGE =
-  "Unfortunately ItemTraxx is currently unavailable. We apologize for any inconvenience and are working to restore access as soon as possible. Please see the status page (https://status.itemtraxx.com/) for more information.";
-
-export const MAINTENANCE_FALLBACK_KEY = "itemtraxx:maintenance_fallback:v1";
-
 export const BASE_CORS_HEADERS = {
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type, x-request-id, prefer, x-itx-session-request, x-itx-data-request, x-captcha-response, x-visitor-id",

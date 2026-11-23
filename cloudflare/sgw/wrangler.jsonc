@@ -4,6 +4,12 @@
   "main": "worker.mjs",
   "compatibility_date": "2026-11-20", // compatibility date for the worker
   "compatibility_flags": ["nodejs_compat"],
+  // Preview builds have no production keys or KV binding.
+  "previews": {
+    "vars": {
+      "SUPABASE_URL": "https://mlaspkufocikfcbjgpof.supabase.co"
+    }
+  },
   "vars": {
     "SUPABASE_URL": "https://mlaspkufocikfcbjgpof.supabase.co" // prod db url
   },

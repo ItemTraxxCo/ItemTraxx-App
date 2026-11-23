@@ -118,18 +118,18 @@ test('ordinary crypto bearer cannot perform key lifecycle operations', async () 
   assert.equal(response.status, 401);
 });
 
-test('production coordinator invokes service-role RPC and rejects unavailable status', async () => {
+test('production coordinator sends the secret API key without a bearer token', async () => {
   const original = globalThis.fetch;
   const seen = [];
   globalThis.fetch = async (url, options) => {
-    seen.push({ url: String(url), body: JSON.parse(options.body), authorization: options.headers.authorization });
+    seen.push({ url: String(url), body: JSON.parse(options.body), headers: options.headers });
     return new Response(JSON.stringify(false), { status: 200 });
   };
   try {
-    const custom = { ...env, SUPABASE_URL: 'https://example.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'test-service-key' };
+    const custom = { ...env, SUPABASE_URL: 'https://example.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'sb_secret_test_key' };
     const response = await worker.fetch(request('/v1/crypto/hash-index', { workspace_id: workspace, values: { borrower_id: 'a' } }), custom);
     assert.equal(response.status, 404);
-    assert.deepEqual(seen, [{ url: 'https://example.supabase.co/rest/v1/rpc/sgw_key_lifecycle_transition', body: { p_workspace_id: workspace, p_action: 'is_active' }, authorization: 'Bearer test-service-key' }]);
+    assert.deepEqual(seen, [{ url: 'https://example.supabase.co/rest/v1/rpc/sgw_key_lifecycle_transition', body: { p_workspace_id: workspace, p_action: 'is_active' }, headers: { 'content-type': 'application/json', apikey: 'sb_secret_test_key' } }]);
   } finally { globalThis.fetch = original; }
 });
 

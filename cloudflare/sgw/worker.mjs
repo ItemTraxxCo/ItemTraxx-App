@@ -37,7 +37,7 @@ export function coordinatorUrl(env) {
 async function coordinate(action, workspaceId, env) {
   const response = await fetch(coordinatorUrl(env), {
     method: 'POST',
-    headers: { 'content-type': 'application/json', apikey: env.SUPABASE_SERVICE_ROLE_KEY, authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}` },
+    headers: { 'content-type': 'application/json', apikey: env.SUPABASE_SERVICE_ROLE_KEY },
     body: JSON.stringify({ p_workspace_id: workspaceId, p_action: action }),
     signal: AbortSignal.timeout(5000),
   });

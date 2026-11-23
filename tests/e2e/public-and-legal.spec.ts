@@ -572,7 +572,7 @@ test.describe("Public surfaces", () => {
     await expect(maintenanceBanner.locator("span")).toHaveText(
       "Scheduled inventory maintenance",
     );
-    const overlay = page.getByRole("alertdialog").filter({ hasText: "Maintenance currently in Progress" });
+    const overlay = page.getByRole("alertdialog").filter({ hasText: "We’re performing maintenance" });
     await expect(overlay).toBeVisible();
     await expect(overlay.getByRole("link", { name: "View Live Status" })).toHaveAttribute(
       "href",
@@ -676,7 +676,7 @@ test.describe("Public surfaces", () => {
     });
 
     const dialogs = page.getByRole("alertdialog");
-    await expect(dialogs.filter({ hasText: "Maintenance currently in Progress" })).toBeVisible();
+    await expect(dialogs.filter({ hasText: "We’re performing maintenance" })).toBeVisible();
     await expect(dialogs.filter({ hasText: "Update Available" })).toHaveCount(0);
     await expect(dialogs.filter({ hasText: "Session Ended" })).toHaveCount(0);
   });

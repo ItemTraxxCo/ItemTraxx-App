@@ -4,10 +4,6 @@ import {
   parseCookies,
 } from "./cookies.ts";
 import {
-  applyMaintenanceFallbackToStatusPayload,
-  readMaintenanceFallback,
-} from "./maintenanceFallback.ts";
-import {
   getFunctionRequestBodyLimit,
   readBoundedRequestBody,
   RequestBodyLimitError,
@@ -19,8 +15,6 @@ import { applyTrustedIngressHeaders } from "./trustedIngress.ts";
 import { enforcePublicRequestLimit } from "./publicRequestRateLimit.ts";
 import { trimTrailingSlash } from "./url.ts";
 
-// The status envelope is small; bound the only upstream response branch that is read.
-export const SYSTEM_STATUS_JSON_MAX_BYTES = 64 * 1024;
 const PUBLIC_FUNCTIONS = new Set([
   "system-status",
   "checkout-borrower-lookup",
@@ -31,40 +25,6 @@ const PUBLIC_FUNCTIONS = new Set([
   "workspace-invitation",
   "account-email-change",
 ]);
-
-const readBoundedSystemStatusText = async (
-  response: Response,
-): Promise<string | null> => {
-  const contentLength = response.headers.get("content-length");
-  if (contentLength !== null) {
-    const declaredBytes = Number(contentLength);
-    if (
-      Number.isFinite(declaredBytes) &&
-      declaredBytes > SYSTEM_STATUS_JSON_MAX_BYTES
-    ) {
-      return null;
-    }
-  }
-
-  const reader = response.clone().body?.getReader();
-  if (!reader) return "";
-  const decoder = new TextDecoder();
-  let totalBytes = 0;
-  let text = "";
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) {
-      return text + decoder.decode();
-    }
-    totalBytes += value.byteLength;
-    if (totalBytes > SYSTEM_STATUS_JSON_MAX_BYTES) {
-      void reader.cancel("system-status response exceeds JSON read limit")
-        .catch(() => undefined);
-      return null;
-    }
-    text += decoder.decode(value, { stream: true });
-  }
-};
 
 export const proxyFunctionRequest = async (
   request: Request,
@@ -169,29 +129,6 @@ export const proxyFunctionRequest = async (
   try {
     upstreamResponse = await invoke(betterAuthToken);
   } catch (error) {
-    if (isSystemStatusGet) {
-      const cached = await readMaintenanceFallback(env);
-      if (cached) {
-        const responseHeaders = new Headers();
-        Object.entries(headers).forEach(([key, value]) =>
-          responseHeaders.set(key, value)
-        );
-        responseHeaders.set("x-request-id", requestId);
-        responseHeaders.set("content-type", "application/json");
-        return new Response(
-          JSON.stringify({
-            status: "down",
-            checks: { config: "ok", db: "failed" },
-            maintenance: cached,
-            maintenance_fallback: true,
-            incident_summary:
-              "system status unavailable; maintenance fallback active",
-            checked_at: new Date().toISOString(),
-          }),
-          { status: 503, headers: responseHeaders },
-        );
-      }
-    }
     throw error;
   }
 
@@ -204,32 +141,6 @@ export const proxyFunctionRequest = async (
     const migrationHeaders = new Headers();
     clearLegacySessionCookies(migrationHeaders, env);
     appendSetCookies(responseHeaders, migrationHeaders);
-  }
-
-  if (isSystemStatusGet) {
-    const rawBody = await readBoundedSystemStatusText(upstreamResponse);
-    if (rawBody !== null) {
-      try {
-        const parsed = JSON.parse(rawBody) as Record<string, unknown>;
-        const withFallback = await applyMaintenanceFallbackToStatusPayload(
-          env,
-          upstreamResponse.status,
-          parsed,
-        );
-        responseHeaders.set("content-type", "application/json");
-        // The clone in readBoundedSystemStatusText tees the upstream body so
-        // the fall-through paths below can still stream the original. On this
-        // path we re-serialize instead, so the original branch is never read
-        // and the tee would buffer it for the life of the response. Release it.
-        void upstreamResponse.body?.cancel().catch(() => undefined);
-        return new Response(JSON.stringify(withFallback), {
-          status: upstreamResponse.status,
-          headers: responseHeaders,
-        });
-      } catch {
-        // Preserve the original upstream payload when JSON parsing fails.
-      }
-    }
   }
 
   return new Response(upstreamResponse.body, {

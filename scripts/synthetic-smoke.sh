@@ -71,7 +71,7 @@ body_has_kill_switch_message() {
   grep -Eiq 'kill switch|killswitch|currently unavailable|maintenance' "$body_file"
 }
 
-kill_switch_active() {
+edge_downtime_active() {
   local status_file
   status_file="$(mktemp)"
   local status
@@ -81,7 +81,9 @@ kill_switch_active() {
     -H "Origin: ${BASE_URL}" \
     "${EDGE_URL}/system-status")"
 
-  if [ "$status" -ge 200 ] && [ "$status" -lt 300 ] && jq -e '.kill_switch.enabled == true' "$status_file" >/dev/null 2>&1; then
+  if [ "$status" -ge 200 ] && [ "$status" -lt 300 ] && jq -e '
+    .kill_switch.enabled == true or .maintenance.enabled == true or .status == "maintenance"
+  ' "$status_file" >/dev/null 2>&1; then
     rm -f "$status_file"
     return 0
   fi
@@ -92,7 +94,7 @@ kill_switch_active() {
 
 skip_for_kill_switch() {
   local target="$1"
-  echo "Kill switch active; treating ${target} as intentional maintenance skip."
+  echo "Edge downtime active; treating ${target} as intentional maintenance skip."
   exit 0
 }
 
@@ -115,7 +117,7 @@ check_html_route() {
       return 0
     fi
 
-    if [ "$status" -eq 503 ] && kill_switch_active; then
+    if [ "$status" -eq 503 ] && edge_downtime_active; then
       rm -f "$body_file"
       skip_for_kill_switch "$url"
     fi
@@ -184,7 +186,7 @@ check_contact_sales_validation() {
       return 0
     fi
 
-    if [ "$status" -eq 503 ] && body_has_kill_switch_message /tmp/itx_contact_body.json && kill_switch_active; then
+    if [ "$status" -eq 503 ] && body_has_kill_switch_message /tmp/itx_contact_body.json && edge_downtime_active; then
       skip_for_kill_switch "${EDGE_URL}/contact-sales-submit"
     fi
 

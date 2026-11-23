@@ -28,6 +28,7 @@
     <AppTopBanners
       :maintenance-visible="showMaintenanceBanner"
       :maintenance-message="maintenanceMessage"
+      :status-page-url="statusPageUrl"
       :broadcast="activeBroadcast"
       :broadcast-visible="showBroadcast"
       :incident="incidentBanner"
@@ -44,6 +45,8 @@
         :brand-logo-url="brandLogoUrl"
         :theme="theme"
         :maintenance-visible="showMaintenanceOverlay"
+        :maintenance-message="maintenanceMessage"
+        :status-page-url="statusPageUrl"
         :version-visible="showVersionOverlay && !showMaintenanceOverlay && !isUnavailableRoute"
         :current-version="appVersion"
         :latest-version="latestVersion"
@@ -122,6 +125,8 @@ import { getWorkspaceState } from "./store/workspaceState";
 import { getFatalErrorToastState } from "./store/fatalErrorToast";
 import { getRouteLoadingState } from "./store/routeLoading";
 import { getSessionTerminationState } from "./store/sessionTermination";
+import { clearEdgeDowntimeState, edgeDowntimeState } from "./store/edgeDowntime";
+import { STATUS_PAGE_URL } from "./utils/statusPageMessage";
 
 const OnboardingModal = defineAsyncComponent(() => import("./components/OnboardingModal.vue"));
 const AuthenticatedNavigation = defineAsyncComponent(() => import("./components/app/AuthenticatedNavigation.vue"));
@@ -154,33 +159,13 @@ const incidentBanner = ref<IncidentBanner | null>(null);
 const dismissedBroadcastId = ref(localStorage.getItem("itemtraxx-broadcast-dismissed") || "");
 const dismissedIncidentId = ref(localStorage.getItem("itemtraxx-incident-dismissed") || "");
 const maintenanceEnabled = ref(false);
-const maintenanceMessage = ref("Maintenance currentlyin progress.");
+const maintenanceMessage = ref("Maintenance is currently in progress. Please see the status page for more information.");
 const killSwitchEnabled = ref(false);
-const killSwitchMessage = ref("Unfortunately ItemTraxx is currently unavailable. We apologize for any inconvenience and are working to restore access as soon as possible. Please see the status page (https://status.itemtraxx.com/?ref=killswitch) for more information.");
+const killSwitchMessage = ref("Unfortunately ItemTraxx is currently unavailable. We apologize for any inconvenience and are working to restore access as soon as possible. Please see the status page for more information");
+const statusPageUrl = computed(() => edgeDowntimeState.value?.statusPageUrl || STATUS_PAGE_URL);
 const backendUnavailable = ref(false);
 const showPageLoading = ref(false);
 let pageLoadingTimer: number | null = null;
-const MAINTENANCE_CACHE_KEY = "itemtraxx-maintenance-state";
-type CachedMaintenanceState = { enabled: boolean; message: string; updatedAt: string };
-
-const readCachedMaintenanceState = (): CachedMaintenanceState | null => {
-  try {
-    const parsed = JSON.parse(localStorage.getItem(MAINTENANCE_CACHE_KEY) || "null") as Partial<CachedMaintenanceState> | null;
-    if (!parsed || typeof parsed.enabled !== "boolean" || typeof parsed.message !== "string" || typeof parsed.updatedAt !== "string") return null;
-    return { enabled: parsed.enabled, message: parsed.message.trim() || "Maintenance currently in progress.", updatedAt: parsed.updatedAt };
-  } catch { return null; }
-};
-const writeCachedMaintenanceState = (state: CachedMaintenanceState | null) => {
-  try {
-    if (state) localStorage.setItem(MAINTENANCE_CACHE_KEY, JSON.stringify(state));
-    else localStorage.removeItem(MAINTENANCE_CACHE_KEY);
-  } catch { /* Best effort only. */ }
-};
-const cachedMaintenanceState = readCachedMaintenanceState();
-if (cachedMaintenanceState?.enabled) {
-  maintenanceEnabled.value = true;
-  maintenanceMessage.value = cachedMaintenanceState.message;
-}
 
 const isDevSubdomainHost = computed(() => {
   const hostname = window.location.hostname.toLowerCase();
@@ -298,8 +283,16 @@ const dismissIncidentBanner = () => {
 const applySystemStatus = () => {
   if (!systemStatus.hasResult) { backendUnavailable.value = false; return; }
   const payload = systemStatus.payload;
-  killSwitchEnabled.value = payload.kill_switch?.enabled === true;
-  if (killSwitchEnabled.value) killSwitchMessage.value = typeof payload.kill_switch?.message === "string" && payload.kill_switch.message.trim() ? payload.kill_switch.message.trim() : "Unfortunately ItemTraxx is currently unavailable. We apologize for any inconvenience and are working to restore access as soon as possible. Please see the status page (https://status.itemtraxx.com/?ref=killswitch) for more information.";
+  const statusName = typeof payload.status === "string" ? payload.status.toLowerCase() : "";
+  killSwitchEnabled.value = payload.kill_switch?.enabled === true ||
+    statusName === "major_outage" || statusName === "unavailable";
+  if (killSwitchEnabled.value) {
+    killSwitchMessage.value = typeof payload.kill_switch?.message === "string" && payload.kill_switch.message.trim()
+      ? payload.kill_switch.message.trim()
+      : typeof payload.incident_summary === "string" && payload.incident_summary.trim()
+      ? payload.incident_summary.trim()
+      : "Unfortunately ItemTraxx is currently unavailable. We apologize for any inconvenience and are working to restore access as soon as possible. Please see the status page for more information";
+  }
   const broadcast = payload.broadcast;
   activeBroadcast.value = broadcast?.enabled && typeof broadcast.message === "string" && broadcast.message.trim() ? {
     id: typeof broadcast.updated_at === "string" && broadcast.updated_at ? broadcast.updated_at : broadcast.message.trim(),
@@ -308,16 +301,25 @@ const applySystemStatus = () => {
   } : null;
   if (payload.maintenance && typeof payload.maintenance === "object") {
     const enabled = payload.maintenance.enabled === true;
-    const message = typeof payload.maintenance.message === "string" && payload.maintenance.message.trim() ? payload.maintenance.message.trim() : "Maintenance currently in progress.";
+    const message = typeof payload.maintenance.message === "string" && payload.maintenance.message.trim()
+      ? payload.maintenance.message.trim()
+      : "Maintenance is currently in progress. Please see the status page for more information.";
     maintenanceEnabled.value = enabled;
     maintenanceMessage.value = message;
-    writeCachedMaintenanceState(enabled ? { enabled: true, message, updatedAt: typeof payload.maintenance.updated_at === "string" ? payload.maintenance.updated_at : new Date().toISOString() } : null);
-  } else if (systemStatus.responseStatus >= 500 || payload.status === "down") {
-    const cached = readCachedMaintenanceState();
-    if (cached?.enabled) { maintenanceEnabled.value = true; maintenanceMessage.value = cached.message; }
-  } else { maintenanceEnabled.value = false; writeCachedMaintenanceState(null); }
+  } else if (statusName === "maintenance") {
+    maintenanceEnabled.value = true;
+    maintenanceMessage.value = typeof payload.incident_summary === "string" && payload.incident_summary.trim()
+      ? payload.incident_summary.trim()
+      : "Maintenance is currently in progress. Please see the status page for more information.";
+  } else {
+    maintenanceEnabled.value = false;
+  }
+  if (systemStatus.responseOk && !killSwitchEnabled.value && !maintenanceEnabled.value) {
+    clearEdgeDowntimeState();
+  }
   if (systemStatus.responseOk && payload.status === "operational") { incidentBanner.value = null; backendUnavailable.value = false; return; }
-  const down = systemStatus.responseStatus >= 500 || payload.status === "down";
+  const down = systemStatus.responseStatus >= 500 ||
+    ["down", "major_outage", "unavailable"].includes(statusName);
   backendUnavailable.value = down && !maintenanceEnabled.value;
   incidentBanner.value = {
     id: payload.checked_at ? String(payload.checked_at) : `${payload.status}-${payload.incident_summary || (down ? "down" : "degraded")}`,
@@ -326,6 +328,20 @@ const applySystemStatus = () => {
     checkedAt: payload.checked_at,
   };
 };
+
+watch(edgeDowntimeState, (downtime) => {
+  if (!downtime) return;
+  backendUnavailable.value = false;
+  if (downtime.mode === "killswitch") {
+    killSwitchEnabled.value = true;
+    killSwitchMessage.value = downtime.message;
+    maintenanceEnabled.value = false;
+    return;
+  }
+  killSwitchEnabled.value = false;
+  maintenanceEnabled.value = true;
+  maintenanceMessage.value = downtime.message;
+}, { immediate: true });
 
 let publicHomeRedirectInFlight = false;
 const maybeRedirectAuthenticatedPublicHome = async () => {

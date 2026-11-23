@@ -34,29 +34,6 @@ const CHECKOUT_ACTIONS = new Set(
   ["checkout", "return", "auto", "admin_return", "quick_return"] as const,
 );
 
-const isLocalhostMaintenanceBypassRequest = (req: Request) => {
-  if (
-    (Deno.env.get("ITX_ALLOW_LOCALHOST_MAINTENANCE_BYPASS") ?? "")
-      .toLowerCase() !== "true"
-  ) {
-    return false;
-  }
-  const origin = req.headers.get("origin");
-  if (!origin) return false;
-  try {
-    const hostname = new URL(origin).hostname.toLowerCase();
-    if (
-      hostname === "localhost" || hostname === "127.0.0.1" ||
-      hostname === "0.0.0.0"
-    ) {
-      return true;
-    }
-    return false;
-  } catch {
-    return false;
-  }
-};
-
 serve((req) => withRequestSpan(req, "POST /functions/checkoutReturn", async (span, requestId) => {
   const { hasOrigin, originAllowed, headers } = resolveCorsHeaders(req, baseCorsHeaders);
 
@@ -251,30 +228,6 @@ serve((req) => withRequestSpan(req, "POST /functions/checkoutReturn", async (spa
       if (!activeAdminSession.valid) {
         return jsonResponse(401, { error: "Session revoked" });
       }
-    }
-
-    const { data: maintenanceRow, error: maintenanceError } = await adminClient
-      .from("app_runtime_config")
-      .select("value")
-      .eq("key", "maintenance_mode")
-      .maybeSingle();
-    if (maintenanceError) {
-      return internalQueryFailure("load_maintenance_config", maintenanceError);
-    }
-    const maintenanceValue =
-      maintenanceRow?.value && typeof maintenanceRow.value === "object"
-        ? (maintenanceRow.value as Record<string, unknown>)
-        : {};
-    if (
-      maintenanceValue.enabled === true &&
-      !isLocalhostMaintenanceBypassRequest(req)
-    ) {
-      return jsonResponse(503, {
-        error: typeof maintenanceValue.message === "string" &&
-            maintenanceValue.message.trim()
-          ? maintenanceValue.message.trim()
-          : "Maintenance mode enabled.",
-      });
     }
 
     let borrower: { id: string; workspace_id: string; access_mode: string } | null = null;

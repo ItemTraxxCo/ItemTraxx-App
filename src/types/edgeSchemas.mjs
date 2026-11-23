@@ -74,12 +74,6 @@ const tenantNotificationSchema = z.object({
     })
   ),
   feature_flags: tenantFeatureFlagsSchema,
-  maintenance: z
-    .object({
-      enabled: z.boolean(),
-      message: z.string(),
-    })
-    .nullable(),
   recent_status_events: z.array(
     z.object({
       id: z.string(),

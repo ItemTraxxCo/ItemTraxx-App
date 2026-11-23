@@ -6,6 +6,9 @@ import { observeSystemStatus, observeSystemStatusUnavailable } from "./serviceAv
 
 export type SystemStatusPayload = {
   status?: string;
+  availability?: "available" | "unavailable";
+  mode?: "killswitch" | "maintenance";
+  statusPageUrl?: string;
   broadcast?: {
     enabled?: boolean;
     message?: string;
@@ -22,6 +25,7 @@ export type SystemStatusPayload = {
     message?: string;
   };
   checks?: {
+    edge?: string;
     db?: string;
     rate_limit?: string;
   };

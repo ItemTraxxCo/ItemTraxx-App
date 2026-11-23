@@ -56,12 +56,6 @@ BETTER_AUTH_PASSKEY_ORIGIN = "https://itemtraxx.com,https://www.itemtraxx.com,ht
 binding = "ORGANIZATION_LOGOS"
 bucket_name = "itemtraxx-organization-logos"
 
-# Optional: enables maintenance-mode fallback state when system-status
-# cannot read Supabase during outages/upgrades.
-[[kv_namespaces]]
-binding = "MAINTENANCE_FALLBACK_KV"
-id = "09542de7b51b4edcb189f38addcba602"
-
 [[ratelimits]]
 name = "SESSION_EXCHANGE_RATE_LIMITER"
 namespace_id = "2026061101"

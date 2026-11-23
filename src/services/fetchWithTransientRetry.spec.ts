@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { edgeDowntimeState, clearEdgeDowntimeState } from "../store/edgeDowntime";
 import { fetchWithTransientRetry } from "./fetchWithTransientRetry";
 
 describe("fetchWithTransientRetry", () => {
@@ -7,6 +8,7 @@ describe("fetchWithTransientRetry", () => {
   });
 
   afterEach(() => {
+    clearEdgeDowntimeState();
     vi.unstubAllGlobals();
   });
 
@@ -60,5 +62,33 @@ describe("fetchWithTransientRetry", () => {
       signal: controller.signal,
     }, { delayMs: 0 })).rejects.toBe(error);
     expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("observes a JSON 503 and leaves the response body readable", async () => {
+    const payload = {
+      status: "unavailable",
+      mode: "killswitch",
+      message: "Unfortunately ItemTraxx is unavailable. Please see the status page.",
+      statusPageUrl: "https://status.itemtraxx.com",
+    };
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(JSON.stringify(payload), {
+        status: 503,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+
+    const response = await fetchWithTransientRetry(
+      "https://edge.itemtraxx.com/rest/v1/workspaces",
+      { method: "GET" },
+      { maxRetries: 0 },
+    );
+
+    expect(edgeDowntimeState.value).toEqual({
+      mode: "killswitch",
+      message: payload.message,
+      statusPageUrl: "https://status.itemtraxx.com",
+    });
+    await expect(response.json()).resolves.toEqual(payload);
   });
 });

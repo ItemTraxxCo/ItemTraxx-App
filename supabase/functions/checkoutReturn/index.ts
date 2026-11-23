@@ -16,6 +16,7 @@ import { readJsonBody } from "../_shared/requestBody.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 import { logError, withRequestSpan } from "../_shared/observability.ts";
 import { sha256Hex } from "../_shared/sha256.ts";
+import { hashBorrowerId } from "../_shared/encryptedBorrower.ts";
 import { buildQuickReturnAuditRecord } from "./adminAudit.ts";
 
 const baseCorsHeaders = {
@@ -235,10 +236,14 @@ serve((req) => withRequestSpan(req, "POST /functions/checkoutReturn", async (spa
     if (!isAdminReturn && !isQuickReturn) {
       const borrowerId = requireText(borrower_id, { maxLen: 32 });
 
+      const encryptedMode = Deno.env.get("ITX_ENCRYPTED_BORROWERS_LOCAL") === "true";
+      const lookupValue = encryptedMode
+        ? await hashBorrowerId(callerProfile.workspace_id, borrowerId, Deno.env.get("ITX_SGW_INTERNAL_SECRET") ?? "")
+        : borrowerId;
       const { data: borrowerData, error: borrowerError } = await adminClient
         .from("borrowers")
         .select("id, workspace_id, access_mode")
-        .eq("borrower_id", borrowerId)
+        .eq(encryptedMode ? "borrower_id_hash" : "borrower_id", lookupValue)
         .eq("workspace_id", callerProfile.workspace_id)
         .is("deleted_at", null)
         .maybeSingle();

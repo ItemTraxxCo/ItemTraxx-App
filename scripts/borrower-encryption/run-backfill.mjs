@@ -1,0 +1,52 @@
+import { createClient } from '@supabase/supabase-js';
+import { backfillWorkspace } from './backfill.mjs';
+
+// Run only during the agreed workspace writer freeze. Secrets are env-only.
+const args = process.argv.slice(2);
+const workspaceId = args[0];
+if (args.length !== 3 || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(workspaceId ?? '') || args[1] !== '--execute' || args[2] !== '--writers-paused') {
+  console.error('Usage: node scripts/borrower-encryption/run-backfill.mjs WORKSPACE_UUID --execute --writers-paused');
+  process.exit(2);
+}
+const url = process.env.ITX_SUPABASE_URL;
+const serviceKey = process.env.ITX_SECRET_KEY;
+const secret = process.env.ITX_SGW_INTERNAL_SECRET;
+try {
+  if (!url || new URL(url).protocol !== 'https:' || !serviceKey || !secret || secret.length < 32) throw new Error('Missing configuration');
+  const db = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
+  const columns = 'id,workspace_id,username,borrower_id,encrypted_data,nonce,auth_tag,key_version,borrower_id_hash';
+  const dataOrFail = ({ data, error }) => { if (error || !data) throw new Error('Database operation failed'); return data; };
+  const store = {
+    list: async (workspace, limit) => dataOrFail(await db.from('borrowers').select(columns).eq('workspace_id', workspace).is('encrypted_data', null).order('id').limit(limit)),
+    listVerifiedPage: async (workspace, cursor, limit) => {
+      let query = db.from('borrowers').select(columns).eq('workspace_id', workspace).not('encrypted_data', 'is', null).order('id').limit(limit);
+      if (cursor) query = query.gt('id', cursor);
+      return dataOrFail(await query);
+    },
+    findHash: async (workspace, hash) => dataOrFail(await db.from('borrowers').select('id').eq('workspace_id', workspace).eq('borrower_id_hash', hash).limit(2)).map((row) => row.id),
+    save: async (row, update) => {
+      const result = await db.from('borrowers').update(update).eq('id', row.id).eq('workspace_id', row.workspace_id).eq('username', row.username).eq('borrower_id', row.borrower_id).is('encrypted_data', null).select('id');
+      return dataOrFail(result).length === 1;
+    },
+    read: async (workspace, id) => dataOrFail(await db.from('borrowers').select(columns).eq('workspace_id', workspace).eq('id', id)).at(0),
+  };
+  const call = async (operation, body) => {
+    const response = await fetch(`https://sgw.itemtraxx.com/v1/crypto/${operation}`, { method: 'POST', headers: { authorization: `Bearer ${secret}`, 'content-type': 'application/json' }, body: JSON.stringify(body), redirect: 'error', signal: AbortSignal.timeout(5000) });
+    if (!response.ok) throw new Error('Gateway operation failed');
+    return await response.json();
+  };
+  const gateway = {
+    encrypt: (workspace, id, payload) => call('encrypt', { workspace_id: workspace, id, payload, index_fields: { borrower_id: payload.borrower_id } }),
+    decrypt: async (workspace, id, envelope) => {
+      const result = await call('decrypt', { workspace_id: workspace, items: [{ id, ...envelope }] });
+      if (!Array.isArray(result.items) || result.items.length !== 1 || result.items[0].id !== id) throw new Error('Invalid gateway response');
+      return result.items[0].payload;
+    },
+    hash: async (workspace, borrowerId) => (await call('hash-index', { workspace_id: workspace, values: { borrower_id: borrowerId } })).borrower_id_hash,
+  };
+  const result = await backfillWorkspace({ workspaceId: workspaceId.toLowerCase(), store, gateway });
+  console.log(`Backfill completed and verified: ${result.migrated} records migrated.`);
+} catch {
+  console.error('Backfill stopped. Inspect configuration and reconcile the workspace before retrying. No plaintext columns were removed.');
+  process.exitCode = 1;
+}

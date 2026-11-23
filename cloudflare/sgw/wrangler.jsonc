@@ -1,0 +1,19 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "itemtraxx-sgw",
+  "main": "worker.mjs",
+  "compatibility_date": "2026-11-20", // compatibility date for the worker
+  "compatibility_flags": ["nodejs_compat"],
+  "routes": [
+    {
+      "pattern": "sgw.itemtraxx.com", // security gateway route domain
+      "custom_domain": true
+    }
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "KEYS",
+      "id": "950e0d5b30d54475b0afbfcbc990c72b" // kv namespace for the keys
+    }
+  ]
+}

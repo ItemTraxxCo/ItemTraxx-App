@@ -2,6 +2,16 @@
 
 Do not deploy or route production traffic to this Worker yet. Application integration, rollout controls, operational reconciliation, Cloudflare bindings, and deployment are incomplete. The existing application still stores and reads plaintext borrower identifiers.
 
+## Cloudflare Workers Builds
+
+For the `itemtraxx-sgw` Worker, configure **Settings > Build** with:
+
+- Root directory: repository root (`/`).
+- Build command: leave empty; this Worker does not need the frontend Vite build.
+- Deploy command: `npm run deploy:cloudflare:sgw`.
+
+The deploy script selects this Worker's Wrangler configuration explicitly and preserves dashboard-managed variables. An unqualified `wrangler deploy` can conflict with the frontend's generated `.wrangler/deploy/config.json` after a Vite build. Updating this repository alone does not change existing Workers Builds settings; save the settings in Cloudflare before retrying the build. Do not enable preview deployments against production keys or KV without isolated preview bindings.
+
 ## Local lifecycle implementation
 
 The Worker expects the `KEYS` KV binding and four secrets: `MASTER_KEK` (base64-encoded 32-byte key), `KMS_INTERNAL_SECRET` (crypto bearer), `KMS_LIFECYCLE_SECRET` (separate, privileged provisioning/revocation bearer), and `SUPABASE_SERVICE_ROLE_KEY`. `SUPABASE_URL` is an HTTPS configuration value. The service role grants broad database access; store it only as a Worker secret and assess a narrower coordinator credential before deployment. Do not expose either bearer or service-role credentials to browsers or log them.

@@ -18,7 +18,10 @@ import {
   createBetterAuthDataClient,
   supabaseBetterAuthAdapter,
 } from "./supabaseBetterAuthAdapter.ts";
-import { resolveInternalAuthAdminTarget } from "./authAdmin.ts";
+import {
+  parseInternalAuthSessionIds,
+  resolveInternalAuthAdminTarget,
+} from "./authAdmin.ts";
 import {
   getPasswordResetDelivery,
   sendPasswordResetEmail,
@@ -1472,6 +1475,14 @@ export const handleInternalAuthAdminRequest = async (request: Request, rawEnv: E
       const { error } = await cachedDataClient.schema("better_auth").from("session").delete().eq("userId", target.user_id);
       if (error) throw error;
       return Response.json({ success: true });
+    }
+    if (action === "revoke_sessions_by_id") {
+      const sessionIds = parseInternalAuthSessionIds(body?.sessionIds);
+      if (!sessionIds) return Response.json({ error: "Invalid request" }, { status: 400 });
+      const { data: deleted, error } = await cachedDataClient.schema("better_auth").from("session")
+        .delete().eq("userId", target.user_id).in("id", sessionIds).select("id");
+      if (error) throw error;
+      return Response.json({ revoked: deleted?.length ?? 0 });
     }
     if (action === "verify_password") {
       // This is an in-session proof check only. Never call Better Auth sign-in

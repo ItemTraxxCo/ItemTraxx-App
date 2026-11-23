@@ -1,3 +1,4 @@
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.108.2";
 import { resolveTrustedGeneralLocation } from "../../_shared/requestMetadata.ts";
 import {
   isMissingPrivilegedStepUpTable,
@@ -33,29 +34,6 @@ const isMissingColumn = (
 const sanitizeText = (value: unknown, max = 255) =>
   optionalText(value, { maxLen: max });
 
-// Revocation must also delete the underlying Better Auth session: revoked_at
-// alone leaves the session cookie valid until its own expiry.
-const deleteBetterAuthSessions = async (
-  adminClient: SuperOpsContext["adminClient"],
-  sessionIds: ReadonlyArray<string | null | undefined>,
-) => {
-  const ids = [...new Set(
-    sessionIds.filter((id): id is string => typeof id === "string" && !!id),
-  )];
-  if (!ids.length) return;
-  const { error } = await adminClient
-    .schema("better_auth")
-    .from("session")
-    .delete()
-    .in("id", ids);
-  if (error && !isMissingRelation(error, "session")) {
-    console.error("Unable to delete Better Auth sessions on revocation", {
-      count: ids.length,
-      code: error.code,
-    });
-  }
-};
-
 const resolveAuthSessionId = async (
   adminClient: SuperOpsContext["adminClient"],
   accessToken: string,
@@ -66,6 +44,72 @@ const resolveAuthSessionId = async (
   return typeof sessionId === "string" && sessionId.trim()
     ? sessionId.trim()
     : null;
+};
+
+const BETTER_AUTH_SESSION_BATCH_SIZE = 100;
+
+// The super_admin_sessions overlay only blocks super-ops. Delete the matching
+// Better Auth sessions as well so the revoked token cannot refresh elsewhere.
+const revokeBetterAuthSessions = async (
+  profileId: string,
+  rows: Array<Record<string, unknown>>,
+) => {
+  const sessionIds = [
+    ...new Set(
+      rows.map((row) => row.auth_session_id).filter((id): id is string =>
+        typeof id === "string" && id.length > 0
+      ),
+    ),
+  ];
+  let revoked = 0;
+  if (rows.some((row) => typeof row.auth_session_id !== "string" || !row.auth_session_id.trim())) {
+    console.error("Cannot revoke unbound super-admin session; manual reconciliation required");
+    return { ok: false as const, requested: sessionIds.length, revoked };
+  }
+  try {
+    for (let i = 0; i < sessionIds.length; i += BETTER_AUTH_SESSION_BATCH_SIZE) {
+      const result = await callBetterAuthAdmin<{ revoked: number }>({
+        action: "revoke_sessions_by_id",
+        profileId,
+        sessionIds: sessionIds.slice(i, i + BETTER_AUTH_SESSION_BATCH_SIZE),
+      });
+      revoked += typeof result.revoked === "number" ? result.revoked : 0;
+    }
+    return { ok: true as const, requested: sessionIds.length, revoked };
+  } catch (error) {
+    console.error("Unable to revoke super-admin Better Auth sessions", {
+      message: error instanceof Error ? error.message : "Unknown error",
+    });
+    return { ok: false as const, requested: sessionIds.length, revoked };
+  }
+};
+
+// A deletion may be repeated after a timeout or a concurrent request. Only
+// finalize the same binding that was deleted; never mark a replacement session.
+const completeSessionRevocation = async (
+  adminClient: SuperOpsContext["adminClient"],
+  profileId: string,
+  row: Record<string, unknown>,
+) => {
+  const now = new Date().toISOString();
+  const { data, error } = await adminClient.from("super_admin_sessions")
+    .update({
+      revoked_at: typeof row.revoked_at === "string" ? row.revoked_at : now,
+      revoked_by: profileId,
+      better_auth_revocation_completed_at: now,
+    })
+    .eq("profile_id", profileId).eq("id", row.id)
+    .eq("auth_session_id", row.auth_session_id)
+    .is("better_auth_revocation_completed_at", null)
+    .select("id");
+  if (error) return false;
+  if (data?.length) return true;
+  // A second request may already have completed this exact binding.
+  const result = await adminClient.from("super_admin_sessions")
+    .select("id, auth_session_id, better_auth_revocation_completed_at")
+    .eq("profile_id", profileId).eq("id", row.id).maybeSingle();
+  return !result.error && result.data?.auth_session_id === row.auth_session_id &&
+    !!result.data?.better_auth_revocation_completed_at;
 };
 
 const resolveJwtLoginMethod = (claims: Record<string, unknown>) => {
@@ -455,11 +499,9 @@ export const handleSecuritySessionsAction = async (
     const sessionId = requireText(payload.session_id, { maxLen: 128 });
     const { data, error } = await adminClient
       .from("super_admin_sessions")
-      .update({ revoked_at: new Date().toISOString(), revoked_by: user.id })
+      .select("id, auth_session_id, revoked_at, better_auth_revocation_completed_at")
       .eq("id", sessionId)
-      .eq("profile_id", user.id)
-      .is("revoked_at", null)
-      .select("id, auth_session_id");
+      .eq("profile_id", user.id);
     if (error && isMissingRelation(error, "super_admin_sessions")) {
       return jsonResponse(400, {
         error: "Session controls unavailable. Run latest SQL setup.",
@@ -471,10 +513,28 @@ export const handleSecuritySessionsAction = async (
     if (!data?.length) {
       return jsonResponse(404, { error: "Session not found." });
     }
-    await deleteBetterAuthSessions(
-      adminClient,
-      data.map((row: { auth_session_id?: string | null }) => row.auth_session_id),
+    if (data[0].better_auth_revocation_completed_at) {
+      return jsonResponse(200, { data: { revoked: true } });
+    }
+    await writeAudit("super_admin_session_revocation_requested", "super_admin_auth", user.id, { session_id: sessionId });
+    const betterAuth = await revokeBetterAuthSessions(user.id, data);
+    await writeAudit(
+      "super_admin_session_revoked",
+      "super_admin_auth",
+      user.id,
+      {
+        session_id: sessionId,
+        better_auth_sessions_requested: betterAuth.requested,
+        better_auth_sessions_revoked: betterAuth.revoked,
+        better_auth_revocation_ok: betterAuth.ok,
+      },
     );
+    if (!betterAuth.ok) {
+      return jsonResponse(503, { error: "Unable to sign out the revoked session." });
+    }
+    if (!await completeSessionRevocation(adminClient, user.id, data[0])) {
+      return jsonResponse(503, { error: "Unable to record session revocation." });
+    }
     return jsonResponse(200, { data: { revoked: true } });
   }
 
@@ -486,9 +546,9 @@ export const handleSecuritySessionsAction = async (
       : await resolveAuthSessionId(adminClient, accessToken);
     const buildQuery = () => adminClient
       .from("super_admin_sessions")
-      .update({ revoked_at: new Date().toISOString(), revoked_by: user.id })
+      .select("id, auth_session_id, revoked_at, better_auth_revocation_completed_at")
       .eq("profile_id", user.id)
-      .is("revoked_at", null);
+      .is("better_auth_revocation_completed_at", null);
     let query = buildQuery();
     if (!signOutCurrent) {
       // Prefer the auth-session binding. A single Better Auth session can be
@@ -496,22 +556,15 @@ export const handleSecuritySessionsAction = async (
       // only the localStorage device id can revoke the current auth session's
       // other row and immediately block this browser.
       if (currentAuthSessionId) {
-        query = query.neq("auth_session_id", currentAuthSessionId);
+        query = query.or(`auth_session_id.is.null,auth_session_id.neq."${currentAuthSessionId.replaceAll("\\", "\\\\").replaceAll('"', '\\"')}"`);
       } else if (currentDeviceId) {
         query = query.neq("device_id", currentDeviceId);
       }
     }
-    let { data, error } = await query.select("id, auth_session_id");
-    if (
-      error && currentAuthSessionId && currentDeviceId &&
-      isMissingColumn(error, "auth_session_id")
-    ) {
-      const fallback = await buildQuery()
-        .neq("device_id", currentDeviceId)
-        .select("id, auth_session_id");
-      data = fallback.data;
-      error = fallback.error;
-    }
+    const { data, error } = await query as {
+      data: Array<Record<string, unknown>> | null;
+      error: { code?: string; message?: string } | null;
+    };
     if (error && isMissingRelation(error, "super_admin_sessions")) {
       return jsonResponse(400, {
         error: "Session controls unavailable. Run latest SQL setup.",
@@ -520,13 +573,30 @@ export const handleSecuritySessionsAction = async (
     if (error) {
       return jsonResponse(400, { error: "Unable to revoke sessions." });
     }
-    await deleteBetterAuthSessions(
-      adminClient,
-      (data ?? []).map(
-        (row: { auth_session_id?: string | null }) => row.auth_session_id,
-      ),
+    const rows = data ?? [];
+    await writeAudit("super_admin_sessions_revocation_requested", "super_admin_auth", user.id, { requested: rows.length, sign_out_current: signOutCurrent });
+    const betterAuth = await revokeBetterAuthSessions(user.id, rows);
+    await writeAudit(
+      "super_admin_sessions_revoked",
+      "super_admin_auth",
+      user.id,
+      {
+        revoked: rows.length,
+        sign_out_current: signOutCurrent,
+        better_auth_sessions_requested: betterAuth.requested,
+        better_auth_sessions_revoked: betterAuth.revoked,
+        better_auth_revocation_ok: betterAuth.ok,
+      },
     );
-    return jsonResponse(200, { data: { revoked: (data ?? []).length } });
+    if (!betterAuth.ok) {
+      return jsonResponse(503, { error: "Unable to sign out the revoked sessions." });
+    }
+    for (const row of rows) {
+      if (!await completeSessionRevocation(adminClient, user.id, row)) {
+        return jsonResponse(503, { error: "Unable to record session revocation." });
+      }
+    }
+    return jsonResponse(200, { data: { revoked: rows.length } });
   }
 
   return null;

@@ -546,31 +546,6 @@ export const PUBLIC_PRERENDER_PAGES = [
       },
     ],
   }),
-  makePage({
-    path: "/changelog",
-    title: "Changelog | ItemTraxx",
-    description:
-      "Review public ItemTraxx product, engineering, security, and operational changes in the changelog.",
-    eyebrow: "ItemTraxx changelog",
-    heading: "Product and operational changes, documented publicly.",
-    paragraphs: [
-      "The ItemTraxx Changelog records public product, engineering, security, and operational changes that are useful to customers and reviewers. It helps explain how the service evolves without exposing customer data, secrets, or private implementation details.",
-      "Changelog entries should be read with the current product, security, privacy, legal, and status pages. A historical entry describes a change at a point in time; it does not replace the current behavior or current policy published elsewhere on the site.",
-      "When a change affects account access, inventory workflows, support, or operational expectations, use the linked public guidance and contact support if a team needs help understanding the impact on its workspace.",
-    ],
-    sections: [
-      {
-        heading: "What the changelog is for",
-        text:
-          "Use it to follow meaningful changes, understand when a behavior was introduced, and find the public page that explains the current workflow. It is not an API contract, a security disclosure, or a substitute for a customer-specific release communication.",
-      },
-      {
-        heading: "Stay current",
-        text:
-          "For service health, use the public status page. For security and privacy review, use the corresponding policy pages. For account or workflow questions, use Contact Support rather than relying on an old changelog entry.",
-      },
-    ],
-  }),
 ];
 
 const INDEX_CONTENT_DIR = join(REPO_ROOT, "src", "content", "index");

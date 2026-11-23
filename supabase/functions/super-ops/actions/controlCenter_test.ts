@@ -155,7 +155,7 @@ Deno.test("handleControlCenterAction returns null for actions it does not own", 
 
 Deno.test("get_control_center assembles runtime config, alert rules, approvals, and jobs", async () => {
   const adminClient = sequenceClient([
-    { data: [{ key: "maintenance_mode", value: false }, { key: "banner", value: "hi" }], error: null },
+    { data: [{ key: "banner", value: "hi" }], error: null },
     { data: [{ id: "rule-1", name: "High errors", metric_key: "errors", threshold: 10, is_enabled: true, created_at: "t" }], error: null },
     { data: [], error: null },
     { data: [], error: null },
@@ -165,7 +165,7 @@ Deno.test("get_control_center assembles runtime config, alert rules, approvals, 
   assertEquals(response!.status, 200);
   assertEquals(await responseBody(response!), {
     data: {
-      runtime_config: { maintenance_mode: false, banner: "hi" },
+      runtime_config: { banner: "hi" },
       alert_rules: [{ id: "rule-1", name: "High errors", metric_key: "errors", threshold: 10, is_enabled: true, created_at: "t" }],
       approvals: [],
       jobs: [],
@@ -203,17 +203,15 @@ Deno.test("set_runtime_config rejects a non-object value", async () => {
   await assertThrowsAsync(
     () =>
       handleControlCenterAction(
-        contextFor("set_runtime_config", { key: "maintenance_mode", value: [] }, adminClient),
+        contextFor("set_runtime_config", { key: "banner", value: [] }, adminClient),
       ) as Promise<unknown>,
     "Invalid request",
   );
 });
 
-Deno.test("set_runtime_config saves the config and records an audit entry", async () => {
+Deno.test("set_runtime_config rejects the retired DB maintenance key", async () => {
   const { calls, writeAudit } = auditRecorder();
-  const adminClient = sequenceClient([
-    { data: { key: "maintenance_mode", value: { enabled: true } }, error: null },
-  ]);
+  const adminClient = sequenceClient([]);
   const response = await handleControlCenterAction(
     contextFor(
       "set_runtime_config",
@@ -223,17 +221,17 @@ Deno.test("set_runtime_config saves the config and records an audit entry", asyn
     ),
   );
 
-  assertEquals(response!.status, 200);
+  assertEquals(response!.status, 410);
   assertEquals(await responseBody(response!), {
-    data: { key: "maintenance_mode", value: { enabled: true } },
+    error: "Maintenance state is controlled by the edge proxy.",
   });
-  assertEquals(calls, [["set_runtime_config", "config", "maintenance_mode", { key: "maintenance_mode" }]]);
+  assertEquals(calls, []);
 });
 
 Deno.test("set_runtime_config reports a generic failure on error", async () => {
   const adminClient = sequenceClient([{ data: null, error: OTHER_ERROR }]);
   const response = await handleControlCenterAction(
-    contextFor("set_runtime_config", { key: "maintenance_mode" }, adminClient),
+    contextFor("set_runtime_config", { key: "system_status_override" }, adminClient),
   );
 
   assertEquals(response!.status, 400);

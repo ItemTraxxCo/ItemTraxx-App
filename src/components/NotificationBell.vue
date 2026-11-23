@@ -45,9 +45,6 @@
             {{ overdueCount }} overdue checkout{{ overdueCount === 1 ? "" : "s" }} (limit:
             {{ checkoutDueHours }}h).
           </li>
-          <li v-if="maintenanceEnabled" class="notif-item notif-critical">
-            Maintenance mode is enabled.
-          </li>
           <li
             v-for="update in updates"
             :key="update.id"
@@ -83,7 +80,6 @@ const error = ref("");
 const flaggedCount = ref(0);
 const overdueCount = ref(0);
 const checkoutDueHours = ref(72);
-const maintenanceEnabled = ref(false);
 const updates = ref<
   Array<{
     id: string;
@@ -101,8 +97,7 @@ const unreadCount = computed(
   () =>
     flaggedCount.value +
     overdueCount.value +
-    updates.value.length +
-    (maintenanceEnabled.value ? 1 : 0)
+    updates.value.length
 );
 
 const notificationSignature = computed(() => {
@@ -111,7 +106,6 @@ const notificationSignature = computed(() => {
   return [
     `flagged:${flaggedCount.value}`,
     `overdue:${overdueCount.value}`,
-    `maint:${maintenanceEnabled.value ? "1" : "0"}`,
     `updates:${updateIds}`,
     `events:${eventIds}`,
   ].join("|");
@@ -150,7 +144,6 @@ const loadNotifications = async (showLoading = true) => {
       flaggedCount.value = 0;
       overdueCount.value = 0;
       checkoutDueHours.value = 72;
-      maintenanceEnabled.value = false;
       updates.value = [];
       recentEvents.value = [];
       return;
@@ -158,7 +151,6 @@ const loadNotifications = async (showLoading = true) => {
     flaggedCount.value = payload.flagged_count;
     overdueCount.value = payload.overdue_count;
     checkoutDueHours.value = payload.checkout_due_hours;
-    maintenanceEnabled.value = payload.maintenance?.enabled === true;
     updates.value = payload.updates.slice(0, 3);
     recentEvents.value = payload.recent_status_events.slice(0, 4);
   } catch (err) {

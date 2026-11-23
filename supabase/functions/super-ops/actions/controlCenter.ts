@@ -37,7 +37,8 @@ export const handleControlCenterAction = async (
       approvalsResult,
       jobsResult,
     ] = await Promise.all([
-      adminClient.from("app_runtime_config").select("key, value"),
+      adminClient.from("app_runtime_config").select("key, value")
+        .neq("key", "maintenance_mode"),
       adminClient
         .from("super_alert_rules")
         .select("id, name, metric_key, threshold, is_enabled, created_at")
@@ -80,6 +81,11 @@ export const handleControlCenterAction = async (
   if (action === "set_runtime_config") {
     const next = payload;
     const key = requireText(next.key, { maxLen: 120 });
+    if (key === "maintenance_mode") {
+      return jsonResponse(410, {
+        error: "Maintenance state is controlled by the edge proxy.",
+      });
+    }
     const value = optionalJsonObject(next.value, 25_000);
 
     const { data, error } = await adminClient

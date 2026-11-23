@@ -474,7 +474,7 @@ onBeforeUnmount(() => {
 <template>
   <div id="top" class="itemtraxx-page">
 <header class="site-header wrap" @keydown.esc="menuOpen = false">
-    <a class="brand" href="#top" aria-label="ItemTraxx home"><img :src="itemtraxxLogo" alt="ItemTraxx Co"></a>
+    <a class="brand" href="#top" aria-label="ItemTraxx home"><img :src="itemtraxxLogo" alt="ItemTraxx Co" width="150" height="50"></a>
     <nav id="main-nav" class="main-nav" :class="{ 'is-open': menuOpen }" aria-label="Main navigation" @click="menuOpen = false"><a href="/pricing">Pricing</a><a href="/contact-support">Support</a><a href="/getting-started">Getting Started</a><a href="/security">Security</a><a class="status-link" href="https://status.itemtraxx.com/" target="_blank" rel="noreferrer" aria-label="Open system status page"><span class="status-dot" :class="statusClass" aria-hidden="true"></span>{{ statusLabel }}</a></nav>
     <div class="header-actions">
       <button class="menu-toggle" type="button" aria-controls="main-nav" :aria-expanded="menuOpen" aria-label="Menu" @click="menuOpen = !menuOpen"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 6h14M3 10h14M3 14h14"/></svg></button>
@@ -518,7 +518,7 @@ onBeforeUnmount(() => {
             </article>
             <div class="transform-arrow" aria-hidden="true"><svg viewBox="0 0 40 40" fill="none"><path d="M5 20h27m-10-10 10 10-10 10" stroke="currentColor" stroke-width="1.8" stroke-linecap="square" stroke-linejoin="miter"/></svg></div>
             <article class="compare-panel" id="checkout">
-              <div class="media-frame checkout-image"><img :src="checkoutReturnUiImage1600" :srcset="`${checkoutReturnUiImage800} 800w, ${checkoutReturnUiImage1200} 1200w, ${checkoutReturnUiImage1600} 1600w`" sizes="(max-width: 700px) 92vw, (max-width: 1300px) 46vw, 600px" alt="ItemTraxx checkout and return screen showing borrower details, checked-out items and checkout controls" width="1600" height="1035"></div>
+              <div class="media-frame checkout-image"><img :src="checkoutReturnUiImage1600" :srcset="`${checkoutReturnUiImage800} 800w, ${checkoutReturnUiImage1200} 1200w, ${checkoutReturnUiImage1600} 1600w`" sizes="(max-width: 700px) 92vw, (max-width: 1300px) 46vw, 600px" alt="ItemTraxx checkout and return screen showing borrower details, checked-out items and checkout controls" width="1600" height="1035" loading="eager" fetchpriority="high"></div>
             </article>
           </div>
         </div>
@@ -671,7 +671,7 @@ onBeforeUnmount(() => {
         <span v-if="showBranchName" class="footer-branch">{{ appBranch }}</span>
       </div>
       <nav class="footer-group" aria-label="Product"><h2>Product</h2><ul><li><a href="/login">Login</a></li><li><a href="/pricing">Pricing</a></li><li><a href="/contact-sales">Contact Sales</a></li><li><a href="/request-demo">Request Demo</a></li><li><a href="/getting-started">Getting Started</a></li></ul></nav>
-      <nav class="footer-group" aria-label="Support"><h2>Support</h2><ul><li><a href="/contact-support">Contact Support</a></li><li><a href="/report-security-issue">Report Security Issue</a></li><li><a href="/changelog">Changelog</a></li><li><a href="/faq">FAQ</a></li><li><a href="https://status.itemtraxx.com/" target="_blank" rel="noreferrer">Status</a></li></ul></nav>
+      <nav class="footer-group" aria-label="Support"><h2>Support</h2><ul><li><a href="/contact-support">Contact Support</a></li><li><a href="/report-security-issue">Report Security Issue</a></li><li><a href="/index/changelog">Changelog</a></li><li><a href="/faq">FAQ</a></li><li><a href="https://status.itemtraxx.com/" target="_blank" rel="noreferrer">Status</a></li></ul></nav>
       <nav class="footer-group" aria-label="Legal"><h2>Legal</h2><ul><li><a href="/legal">Legal Home</a></li><li><a href="/legal/privacy">Privacy</a></li><li><a href="/legal/student-privacy">Student Privacy</a></li><li><a href="/legal/terms">Terms of Service</a></li><li><a href="/legal/subprocessors">Subprocessors</a></li><li><a href="/legal/dpa">Data Processing Addendum</a></li><li><a href="/privacy-request">Privacy Request</a></li><li><a href="/legal/cookies">Cookies</a></li><li><a href="/accessibility">Accessibility</a></li><li><a href="/security">Security</a></li><li><a href="/trust">Trust</a></li><li><a href="/compliance">Compliance</a></li></ul></nav>
       <nav class="footer-group" aria-label="Company"><h2>Company</h2><ul><li><RouterLink to="/index">Index</RouterLink></li><li><a href="/">Home</a></li><li><a href="/contact">Contact</a></li><li><a href="/about">About</a></li><li><a href="https://github.com/ItemTraxxCo" target="_blank" rel="noreferrer">GitHub</a></li></ul></nav>
     </div>

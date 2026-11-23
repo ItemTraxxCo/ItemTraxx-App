@@ -232,6 +232,191 @@ Deno.test("edge proxy CORS requires exact configured origins", async () => {
   }
 });
 
+Deno.test("killswitch and maintenance return JSON 503s for HTML-accepting API requests", async () => {
+  const cases = [
+    {
+      mode: "killswitch",
+      flag: "ITX_KILLSWITCH_ENABLED",
+      messageKey: "ITX_KILLSWITCH_MESSAGE",
+      message: "The service is unavailable. Please see the status page.",
+    },
+    {
+      mode: "maintenance",
+      flag: "ITX_MAINTENANCE_ENABLED",
+      messageKey: "ITX_MAINTENANCE_MESSAGE",
+      message: "Maintenance is in progress. Please see the status page.",
+    },
+  ] as const;
+
+  for (const testCase of cases) {
+    const response = await worker.fetch(
+      new Request("https://edge.itemtraxx.com/rest/v1/workspaces", {
+        headers: {
+          origin: "https://app.itemtraxx.com",
+          accept: "text/html,application/xhtml+xml",
+        },
+      }),
+      {
+        [testCase.flag]: "true",
+        [testCase.messageKey]: testCase.message,
+      } as Env,
+      executionContext,
+    );
+
+    if (response.status !== 503) {
+      throw new Error(`${testCase.mode} should return 503, got ${response.status}`);
+    }
+    if (!response.headers.get("content-type")?.includes("application/json")) {
+      throw new Error(`${testCase.mode} response must have a JSON content type`);
+    }
+    if (
+      response.headers.get("Access-Control-Allow-Origin") !==
+        "https://app.itemtraxx.com"
+    ) {
+      throw new Error(`${testCase.mode} response must include the allowed CORS origin`);
+    }
+    if (response.headers.get("Access-Control-Allow-Credentials") !== "true") {
+      throw new Error(`${testCase.mode} response must retain credentialed CORS`);
+    }
+    if (
+      !response.headers.get("Access-Control-Allow-Headers")?.includes(
+        "content-type",
+      ) ||
+      !response.headers.get("Access-Control-Expose-Headers")?.includes(
+        "x-request-id",
+      )
+    ) {
+      throw new Error(`${testCase.mode} response must retain the API CORS header contract`);
+    }
+
+    const body = await response.json() as Record<string, unknown>;
+    const expected = {
+      status: "unavailable",
+      mode: testCase.mode,
+      message: testCase.message,
+      statusPageUrl: "https://status.itemtraxx.com",
+    };
+    if (JSON.stringify(body) !== JSON.stringify(expected)) {
+      throw new Error(
+        `${testCase.mode} response body mismatch: ${JSON.stringify(body)}`,
+      );
+    }
+  }
+});
+
+Deno.test("system-status remains a 200 JSON response during edge downtime", async () => {
+  const cases = [
+    {
+      mode: "killswitch",
+      flag: "ITX_KILLSWITCH_ENABLED",
+      expectedStatus: "major_outage",
+    },
+    {
+      mode: "maintenance",
+      flag: "ITX_MAINTENANCE_ENABLED",
+      expectedStatus: "maintenance",
+    },
+  ] as const;
+
+  for (const testCase of cases) {
+    const response = await worker.fetch(
+      new Request("https://edge.itemtraxx.com/functions/system-status", {
+        headers: { origin: "https://app.itemtraxx.com" },
+      }),
+      { [testCase.flag]: "true" } as Env,
+      executionContext,
+    );
+    const body = await response.json() as Record<string, unknown>;
+
+    if (response.status !== 200 || body.status !== testCase.expectedStatus) {
+      throw new Error(
+        `${testCase.mode} system status should return 200/${testCase.expectedStatus}`,
+      );
+    }
+    if (!response.headers.get("content-type")?.includes("application/json")) {
+      throw new Error("System status response must have a JSON content type");
+    }
+    if (body.statusPageUrl !== "https://status.itemtraxx.com") {
+      throw new Error("System status must include the status page URL");
+    }
+  }
+});
+
+Deno.test("spoofed Referer without Origin does not bypass edge downtime", async () => {
+  for (const flag of ["ITX_MAINTENANCE_ENABLED", "ITX_KILLSWITCH_ENABLED"] as const) {
+    for (const referer of ["http://localhost:5173/", "https://dev.itemtraxx.com/"]) {
+      const response = await worker.fetch(
+        new Request("https://edge.itemtraxx.com/rest/v1/workspaces", {
+          headers: { referer },
+        }),
+        { [flag]: "true", TRUST_LOCAL_ORIGINS: "false" } as Env,
+        executionContext,
+      );
+      if (response.status !== 503) {
+        throw new Error(
+          `${flag} with Referer ${referer} and no Origin must return 503, got ${response.status}`,
+        );
+      }
+    }
+  }
+});
+
+Deno.test("dev domains and trusted localhost origins bypass both killswitch and maintenance", async () => {
+  for (const flag of ["ITX_MAINTENANCE_ENABLED", "ITX_KILLSWITCH_ENABLED"] as const) {
+    const devResponse = await worker.fetch(
+      new Request("https://edge.itemtraxx.com/rest/v1/workspaces", {
+        headers: { origin: "https://dev.itemtraxx.com" },
+      }),
+      { [flag]: "true", TRUST_LOCAL_ORIGINS: "false" } as Env,
+      executionContext,
+    );
+    if (devResponse.status === 503) {
+      throw new Error(`${flag} should allow dev.itemtraxx.com to bypass edge downtime`);
+    }
+
+    const trustedLocalResponse = await worker.fetch(
+      new Request("https://edge.itemtraxx.com/rest/v1/workspaces", {
+        headers: { origin: "http://localhost:5173" },
+      }),
+      { [flag]: "true", TRUST_LOCAL_ORIGINS: "true" } as Env,
+      executionContext,
+    );
+    if (trustedLocalResponse.status === 503) {
+      throw new Error(`${flag} should allow localhost to bypass when TRUST_LOCAL_ORIGINS=true`);
+    }
+
+    const untrustedLocalResponse = await worker.fetch(
+      new Request("https://edge.itemtraxx.com/rest/v1/workspaces", {
+        headers: { origin: "http://localhost:5173" },
+      }),
+      { [flag]: "true", TRUST_LOCAL_ORIGINS: "false" } as Env,
+      executionContext,
+    );
+    if (untrustedLocalResponse.status !== 403) {
+      throw new Error(
+        `${flag} should reject localhost when TRUST_LOCAL_ORIGINS=false, got ${untrustedLocalResponse.status}`,
+      );
+    }
+  }
+});
+
+Deno.test("internal auth admin bridge is not masked by edge downtime when secret header is supplied", async () => {
+  const response = await worker.fetch(
+    new Request("https://edge.itemtraxx.com/api/auth/internal-admin", {
+      method: "POST",
+      headers: { "x-itx-internal-auth": "wrong-secret" },
+    }),
+    {
+      ITX_MAINTENANCE_ENABLED: "true",
+      ITX_INTERNAL_AUTH_SECRET: "expected-secret",
+    } as Env,
+    executionContext,
+  );
+  if (response.status !== 401) {
+    throw new Error(`Expected internal-admin bridge to enforce secret auth (401), got ${response.status}`);
+  }
+});
+
 Deno.test("rate limits public email sign-in before reading its form body", async () => {
   let bodyRead = false;
   let limiterKey = "";

@@ -33,8 +33,7 @@ const base = {
 };
 const password = () => `${crypto.randomUUID()}-Aa1!`;
 serve(async (req) => {
-  const origin = req.headers.get("origin"),
-    { originAllowed: ok, headers } = resolveCorsHeaders(req, base),
+  const { originAllowed: ok, headers } = resolveCorsHeaders(req, base),
     json = (status: number, body: Record<string, unknown>) =>
       new Response(JSON.stringify({ ok: status < 400, ...body }), {
         status,

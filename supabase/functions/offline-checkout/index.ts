@@ -182,22 +182,6 @@ serve(async (req) => {
       return jsonResponse(403, { error: "Workspace disabled" });
     }
 
-    const { data: maintenanceRow } = await adminClient
-      .from("app_runtime_config").select("value")
-      .eq("key", "maintenance_mode").maybeSingle();
-    const maintenance = maintenanceRow?.value &&
-        typeof maintenanceRow.value === "object"
-      ? maintenanceRow.value as Record<string, unknown>
-      : {};
-    if (maintenance.enabled === true) {
-      return jsonResponse(503, {
-        error: typeof maintenance.message === "string" &&
-            maintenance.message.trim()
-          ? maintenance.message.trim()
-          : "Maintenance mode enabled.",
-      });
-    }
-
     const rateLimitRequestLimit = action === "prepare_pack"
       ? 3
       : action === "prepare_pack_chunk"

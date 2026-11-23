@@ -22,6 +22,7 @@ type EdgeFunctionResult<TData> = {
   requestId?: string;
 };
 import { clearAdminVerification, clearAuthState } from "../store/authState";
+import { observeEdgeDowntimePayload } from "../store/edgeDowntime";
 import { getEdgeFunctionsBaseUrl } from "./edgeUrls";
 import { captureHandledRequestFailure, capturePostHogLog } from "./posthogDiagnostics";
 import { createRequestId } from "./requestId";
@@ -111,6 +112,7 @@ const requestEdgeFunction = async <TData = unknown, TBody = unknown>(
     }
 
     const payload = parsed as { error?: string; message?: string } | null;
+    observeEdgeDowntimePayload(response.status, parsed);
     const responseRequestId = response.headers.get("x-request-id") ??
       headers["x-request-id"] ?? requestId;
     const latencyMs = Math.round(performance.now() - startedAt);

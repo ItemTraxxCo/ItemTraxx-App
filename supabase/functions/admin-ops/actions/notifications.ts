@@ -36,7 +36,6 @@ export const handleNotificationAction = async (
         ? 0
         : overdueCountResult.count ?? 0,
       flagged_count: statusCountResult.error ? 0 : statusCountResult.count ?? 0,
-      maintenance: context.maintenance,
       recent_status_events: recentStatusResult.error
         ? []
         : recentStatusResult.data ?? [],
@@ -80,17 +79,4 @@ export const normalizeWorkspaceUpdates = (value: unknown): RuntimeUpdateItem[] =
     })
     .filter((item): item is RuntimeUpdateItem => !!item)
     .slice(0, 5);
-};
-
-export const resolveMaintenance = (value: unknown) => {
-  if (!value || typeof value !== "object") {
-    return { enabled: false, message: "" };
-  }
-  const payload = value as Record<string, unknown>;
-  return {
-    enabled: payload.enabled === true,
-    message: typeof payload.message === "string" && payload.message.trim()
-      ? payload.message.trim()
-      : "Maintenance in progress.",
-  };
 };

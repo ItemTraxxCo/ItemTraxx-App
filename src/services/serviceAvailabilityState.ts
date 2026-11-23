@@ -1,4 +1,5 @@
-const MAINTENANCE_CACHE_KEY = "itemtraxx-maintenance-state";
+import { edgeDowntimeState } from "../store/edgeDowntime";
+
 const AVAILABILITY_SIGNAL_MAX_AGE_MS = 10 * 60 * 1000;
 
 type SystemStatusSignal = {
@@ -13,18 +14,6 @@ type SystemStatusSignal = {
 
 let latestSignal: { suppressHandledFailures: boolean; observedAt: number } | null = null;
 
-const isCachedMaintenanceEnabled = () => {
-  if (typeof window === "undefined") return false;
-  try {
-    const cached = JSON.parse(
-      window.localStorage.getItem(MAINTENANCE_CACHE_KEY) || "null",
-    ) as { enabled?: unknown } | null;
-    return cached?.enabled === true;
-  } catch {
-    return false;
-  }
-};
-
 export const observeSystemStatus = ({ ok, status, payload }: SystemStatusSignal) => {
   const statusName = typeof payload?.status === "string"
     ? payload.status.trim().toLowerCase()
@@ -32,6 +21,8 @@ export const observeSystemStatus = ({ ok, status, payload }: SystemStatusSignal)
   const isExplicitDisruption = status >= 500 ||
     statusName === "degraded" ||
     statusName === "down" ||
+    statusName === "major_outage" ||
+    statusName === "unavailable" ||
     statusName === "maintenance" ||
     payload?.maintenance?.enabled === true ||
     payload?.kill_switch?.enabled === true;
@@ -58,9 +49,10 @@ export const observeSystemStatusUnavailable = () => {
  * or intentionally unavailable. Real uncaught exceptions are not filtered.
  */
 export const isExpectedServiceDisruption = () => {
+  if (edgeDowntimeState.value !== null) return true;
   if (typeof window !== "undefined") {
     const path = window.location.pathname.replace(/\/+$/, "") || "/";
-    if (path === "/unavailable" || isCachedMaintenanceEnabled()) return true;
+    if (path === "/unavailable") return true;
   }
 
   return latestSignal?.suppressHandledFailures === true &&

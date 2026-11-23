@@ -120,7 +120,8 @@ const parseFile = ([path, source]: [string, string]): IndexEntry | null => {
 
 const entries = Object.entries(rawFiles)
   .map(parseFile)
-  .filter((entry): entry is IndexEntry => entry !== null);
+  .filter((entry): entry is IndexEntry => entry !== null)
+  .filter((entry) => import.meta.env.DEV || !entry.draft);
 
 if (import.meta.env.DEV) {
   const seen = new Set<string>();
@@ -132,15 +133,21 @@ if (import.meta.env.DEV) {
   }
 }
 
-const isPublished = (entry: IndexEntry) => !entry.draft;
+const canViewDraftsOnLocalhost = () => {
+  if (typeof window === "undefined") return false;
+  const hostname = window.location.hostname.toLowerCase();
+  return ["localhost", "127.0.0.1", "::1", "[::1]"].includes(hostname);
+};
+
+const isVisible = (entry: IndexEntry) => !entry.draft || canViewDraftsOnLocalhost();
 
 export const getIndexEntries = () =>
   entries
-    .filter(isPublished)
+    .filter(isVisible)
     .sort((a, b) => b.date.localeCompare(a.date) || a.title.localeCompare(b.title));
 
 export const getIndexEntry = (slug: string) =>
-  entries.find((entry) => entry.slug === slug && isPublished(entry)) ?? null;
+  entries.find((entry) => entry.slug === slug && isVisible(entry)) ?? null;
 
 export const renderIndexMarkdown = (markdown: string) => {
   const sanitizedHtml = DOMPurify.sanitize(marked.parse(markdown, { async: false }));

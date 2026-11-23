@@ -9,7 +9,7 @@ import {
   readBoundedRequestBody,
   RequestBodyLimitError,
 } from "./requestBody.ts";
-import { buildError, buildSessionRateLimitError } from "./responses.ts";
+import { buildError } from "./responses.ts";
 import {
   isBlockedRpcProxyPath,
   isRpcProxyPath,

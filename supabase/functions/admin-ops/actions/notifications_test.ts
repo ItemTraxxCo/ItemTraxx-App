@@ -1,7 +1,6 @@
 import {
   handleNotificationAction,
   normalizeWorkspaceUpdates,
-  resolveMaintenance,
 } from "./notifications.ts";
 import type { AdminOpsContext, SupabaseClient } from "../context.ts";
 
@@ -109,7 +108,6 @@ const baseContext = (
     enable_status_tracking: true,
     enable_barcode_generator: true,
   },
-  maintenance: { enabled: false, message: "" },
   workspaceUpdates: [],
   jsonResponse: (status, body) =>
     new Response(JSON.stringify(body), {
@@ -118,7 +116,6 @@ const baseContext = (
     }),
   ...overrides,
 });
-
 const bodyOf = (response: Response) =>
   response.json() as Promise<Record<string, unknown>>;
 
@@ -141,7 +138,6 @@ Deno.test("get_notifications reports flagged/overdue counts and echoes context c
   const response = await handleNotificationAction(
     baseContext(client, {
       checkoutDueHours: 48,
-      maintenance: { enabled: true, message: "Upgrading" },
       workspaceUpdates: [{
         id: "u1",
         title: "Heads up",
@@ -159,10 +155,6 @@ Deno.test("get_notifications reports flagged/overdue counts and echoes context c
   assert(data.overdue_count === 5, `expected overdue_count 5, got ${data.overdue_count}`);
   assert(data.flagged_count === 3, `expected flagged_count 3, got ${data.flagged_count}`);
   assert(data.checkout_due_hours === 48, "expected checkout_due_hours to be echoed");
-  assert(
-    (data.maintenance as { enabled: boolean }).enabled === true,
-    "expected maintenance to be echoed",
-  );
   assert(
     Array.isArray(data.recent_status_events) &&
       (data.recent_status_events as unknown[]).length === 1,
@@ -294,36 +286,4 @@ Deno.test("normalizeWorkspaceUpdates caps output at 5 items", () => {
   const items = Array.from({ length: 8 }, (_, i) => ({ message: `msg-${i}` }));
   const result = normalizeWorkspaceUpdates({ enabled: true, items });
   assert(result.length === 5, `expected at most 5 items, got ${result.length}`);
-});
-
-Deno.test("resolveMaintenance returns disabled default for non-object input", () => {
-  const result = resolveMaintenance(null);
-  assert(result.enabled === false, "expected disabled by default");
-  assert(result.message === "", "expected empty message by default");
-  assert(resolveMaintenance("nope").enabled === false, "string input should default to disabled");
-  assert(resolveMaintenance(undefined).enabled === false, "undefined input should default to disabled");
-});
-
-Deno.test("resolveMaintenance requires enabled === true strictly", () => {
-  assert(resolveMaintenance({ enabled: "true" }).enabled === false, "string 'true' should not enable");
-  assert(resolveMaintenance({ enabled: 1 }).enabled === false, "number 1 should not enable");
-  assert(resolveMaintenance({ enabled: true }).enabled === true, "boolean true should enable");
-});
-
-Deno.test("resolveMaintenance falls back to a default message when enabled without text", () => {
-  const withoutMessage = resolveMaintenance({ enabled: true });
-  assert(
-    withoutMessage.message === "Maintenance in progress.",
-    "expected the default maintenance message",
-  );
-  const withBlankMessage = resolveMaintenance({ enabled: true, message: "   " });
-  assert(
-    withBlankMessage.message === "Maintenance in progress.",
-    "expected blank message to fall back to default",
-  );
-  const withMessage = resolveMaintenance({ enabled: true, message: "  Down for repairs  " });
-  assert(
-    withMessage.message === "Down for repairs",
-    "expected explicit message to be trimmed and preserved",
-  );
 });

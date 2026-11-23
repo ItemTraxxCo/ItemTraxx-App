@@ -41,6 +41,7 @@ jobs:
       contents: write
     outputs:
       updated_head_sha: ${{ steps.updated-head.outputs.sha }}
+      diff_base_sha: ${{ steps.updated-head.outputs.diff_base_sha }}
 
     steps:
       - name: Checkout PR branch
@@ -203,9 +204,12 @@ jobs:
       - name: Record updated PR head SHA
         id: updated-head
         if: ${{ github.event_name == 'pull_request' && steps.lockfile.outputs.changed == 'true' }}
+        env:
+          EXPECTED_BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           set -euo pipefail
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "diff_base_sha=$(git merge-base "$EXPECTED_BASE_SHA" HEAD)" >> "$GITHUB_OUTPUT"
 
   kill-switch-preflight:
     needs: sync
@@ -222,5 +226,5 @@ jobs:
     uses: ./.github/workflows/ci-validation.yml
     with:
       ref: ${{ needs.sync.outputs.updated_head_sha }}
-      diff_base_sha: ${{ github.event.pull_request.base.sha }}
+      diff_base_sha: ${{ needs.sync.outputs.diff_base_sha }}
       diff_head_sha: ${{ needs.sync.outputs.updated_head_sha }}

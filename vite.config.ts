@@ -1,6 +1,6 @@
 import { execSync } from "node:child_process";
-import { mkdirSync, writeFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { isAbsolute, relative, resolve } from "node:path";
 import { defineConfig, loadEnv } from "vite";
 import type { Plugin } from "vite";
 import vue from "@vitejs/plugin-vue";
@@ -25,6 +25,50 @@ const initialModuleMapPlugin = (): Plugin => ({
       resolve(artifactsDir, "initial-module-map.json"),
       `${JSON.stringify(moduleMap, null, 2)}\n`
     );
+  },
+});
+
+const stripDraftIndexContentPlugin = (): Plugin => ({
+  name: "itemtraxx-strip-draft-index-content",
+  enforce: "pre",
+  apply: "build",
+  load(id) {
+    const [filePath, query] = id.split("?", 2);
+    if (!filePath?.endsWith(".md") || !query?.split("&").includes("raw")) {
+      return null;
+    }
+
+    const indexContentDir = resolve("src/content/index");
+    const relativePath = relative(indexContentDir, filePath);
+    if (
+      !relativePath ||
+      relativePath.startsWith("..") ||
+      isAbsolute(relativePath) ||
+      relativePath.toLowerCase() === "readme.md"
+    ) {
+      return null;
+    }
+
+    const source = readFileSync(filePath, "utf8");
+    const frontmatter = source.match(/^---\s*\r?\n([\s\S]*?)\r?\n---\s*(?:\r?\n|$)/);
+    const draftLine = frontmatter?.[1]
+      ?.split(/\r?\n/)
+      .find((line) => /^draft\s*:/i.test(line));
+    const draftValue = draftLine
+      ?.slice(draftLine.indexOf(":") + 1)
+      .trim()
+      .replace(/^(?:"([\s\S]*)"|'([\s\S]*)')$/, "$1$2")
+      .toLowerCase();
+
+    // The article loader treats anything except an explicit `draft: false` as
+    // a draft. Keep that same rule here so unpublished Markdown never ships in
+    // a production bundle, even though localhost development can preview it.
+    if (draftValue === "false") return null;
+
+    return {
+      code: 'export default ""',
+      moduleSideEffects: false,
+    };
   },
 });
 
@@ -110,6 +154,7 @@ export default defineConfig(({ mode, command }) => {
 
   return {
     plugins: [
+      ...(command === "build" ? [stripDraftIndexContentPlugin()] : []),
       vue(),
       ...(env.VITE_E2E_TEST_UTILS === "true"
         ? []

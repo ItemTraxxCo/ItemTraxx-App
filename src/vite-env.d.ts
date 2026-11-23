@@ -2,6 +2,7 @@
 
 interface ImportMetaEnv {
   readonly VITE_APP_URL?: string;
+  readonly VITE_ENCRYPTED_BORROWERS_LOCAL?: string;
   readonly VITE_SUPABASE_URL: string;
   readonly VITE_SUPABASE_ANON_KEY: string;
   readonly VITE_EDGE_PROXY_URL?: string;

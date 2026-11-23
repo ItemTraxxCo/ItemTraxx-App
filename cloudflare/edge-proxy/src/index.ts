@@ -1,6 +1,5 @@
 import {
   DEFAULT_ALLOWED_ORIGINS,
-  DEFAULT_KILL_SWITCH_MESSAGE,
 } from "./constants.ts";
 import { isLocalhostOrigin, parseCsv, withCorsHeaders } from "./cors.ts";
 import { proxyFunctionRequest } from "./functionProxy.ts";
@@ -25,6 +24,13 @@ import { enforcePublicRequestLimit } from "./publicRequestRateLimit.ts";
 import { normalizeBetterAuthPathname } from "./authCaptcha.ts";
 import { handleMtaStsRequest, isMtaStsRequest } from "./mtaSts.ts";
 import {
+  buildDowntimeResponse,
+  buildSystemStatusResponse,
+  isSystemStatusRequest,
+  isUnavailableBypassRequest,
+  resolveDowntimeState,
+} from "./downtime.ts";
+import {
   handleBetterAuthRequest,
   getBetterAuth,
   handleInternalAuthAdminRequest,
@@ -36,9 +42,6 @@ import {
   createSsoLoginProof,
   isSessionCreatedDuringSsoCallback,
 } from "../../../supabase/functions/_shared/ssoLoginProvenance.ts";
-
-const resolveKillSwitchMessage = (env: Env) =>
-  env.ITX_ITEMTRAXX_KILLSWITCH_MESSAGE?.trim() || DEFAULT_KILL_SWITCH_MESSAGE;
 
 const PUBLIC_AUTH_RATE_LIMIT_SCOPES = new Map([
   ["/api/auth/sign-in/email", "better-auth-email-sign-in"],
@@ -270,6 +273,34 @@ export default {
           return buildError(403, "Origin not allowed", headers, requestId);
         }
 
+        // Downtime is controlled at the edge. Status probes stay live and
+        // report the configured mode without consulting Supabase; every other
+        // request is stopped before auth, rate-limit, or origin dispatch.
+        const downtime = resolveDowntimeState(env);
+        const systemStatusRequest = request.method === "GET" &&
+          isSystemStatusRequest(url.pathname);
+        if (systemStatusRequest && downtime) {
+          return buildSystemStatusResponse(downtime, headers, requestId);
+        }
+        const bypassDowntime = Boolean(downtime) &&
+          isUnavailableBypassRequest(tracedRequest, env);
+        const isInternalAuthAdminBridge =
+          (url.pathname === "/api/auth/internal-admin" ||
+            url.pathname === "/api/internal/auth-admin") &&
+          Boolean(tracedRequest.headers.get("x-itx-internal-auth"));
+        if (
+          downtime &&
+          !bypassDowntime &&
+          !systemStatusRequest &&
+          !isInternalAuthAdminBridge
+        ) {
+          return buildDowntimeResponse(
+            downtime,
+            headers,
+            requestId,
+          );
+        }
+
         // Keep the server-to-server Better Auth administration bridge under the
         // authenticated API namespace. Cloudflare's managed bot challenge can
         // challenge non-browser requests to otherwise-unrecognised `/api/*`
@@ -405,34 +436,6 @@ export default {
           return response;
         }
 
-        const killSwitchEnabled =
-          (env.ITX_ITEMTRAXX_KILLSWITCH_ENABLED ?? "").toLowerCase() === "true";
-        const killSwitchBlocksRequest = killSwitchEnabled &&
-          !isLocalhostOrigin(origin);
-        const buildKillSwitchResponse = (extra: Record<string, unknown>) => {
-          const response = buildError(
-            503,
-            resolveKillSwitchMessage(env),
-            headers,
-            requestId,
-          );
-          maybeReportWorkerResponse(env, request, requestId, response, ctx, {
-            type: "kill_switch",
-            ...extra,
-          }, trace);
-          return response;
-        };
-
-        // REST and RPC requests return from this branch, so they must be checked
-        // before dispatch. Otherwise a kill-switch incident still permits table
-        // reads and direct audit-log writes through the PostgREST pass-through.
-        if (
-          killSwitchBlocksRequest &&
-          (isRestProxyPath(url.pathname) || isRpcProxyPath(url.pathname))
-        ) {
-          return buildKillSwitchResponse({ path: url.pathname });
-        }
-
         if (isBlockedRpcProxyPath(url.pathname)) {
           return buildError(
             403,
@@ -491,12 +494,6 @@ export default {
         // consulted, so a stale or widened ALLOWED_FUNCTIONS cannot expose them.
         if (isInternalOnlyFunction(functionName)) {
           return buildError(403, "Function not allowed", headers, requestId);
-        }
-
-        if (
-          killSwitchBlocksRequest && functionName !== "system-status"
-        ) {
-          return buildKillSwitchResponse({ functionName });
         }
 
         const allowedFunctions = resolveAllowedFunctions(env);

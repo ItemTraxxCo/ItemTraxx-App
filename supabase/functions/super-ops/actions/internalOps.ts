@@ -43,7 +43,7 @@ export const handleInternalOpsAction = async (
       adminClient
         .from("app_runtime_config")
         .select("key, value")
-        .in("key", ["maintenance_mode", "broadcast_message"]),
+        .eq("key", "broadcast_message"),
       adminClient
         .from("super_admin_audit_logs")
         .select(

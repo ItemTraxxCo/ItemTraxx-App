@@ -45,6 +45,9 @@ describe("AppBlockingOverlays", () => {
     ]);
     await wrapper.find(".downtime-screen-action-support").trigger("click");
     expect(openIntercom).toHaveBeenCalledOnce();
+    expect((openIntercom.mock.calls[0]?.[0] as CustomEvent).detail).toEqual({
+      allowAnonymousFallback: true,
+    });
     window.removeEventListener(SUPPORT_MESSENGER_OPEN_EVENT, openIntercom);
   });
 

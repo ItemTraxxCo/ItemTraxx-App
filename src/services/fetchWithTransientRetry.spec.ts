@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { edgeDowntimeState, clearEdgeDowntimeState } from "../store/edgeDowntime";
+import { isExpectedServiceDisruption } from "./serviceAvailabilityState";
 import { fetchWithTransientRetry } from "./fetchWithTransientRetry";
 
 describe("fetchWithTransientRetry", () => {
@@ -89,6 +90,9 @@ describe("fetchWithTransientRetry", () => {
       message: payload.message,
       statusPageUrl: "https://status.itemtraxx.com",
     });
+    expect(isExpectedServiceDisruption()).toBe(true);
+    clearEdgeDowntimeState();
+    expect(isExpectedServiceDisruption()).toBe(false);
     await expect(response.json()).resolves.toEqual(payload);
   });
 });

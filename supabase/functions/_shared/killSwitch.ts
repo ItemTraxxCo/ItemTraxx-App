@@ -1,13 +1,22 @@
 const lower = (value: string | null | undefined) => (value ?? "").toLowerCase();
 
 const DEFAULT_KILL_SWITCH_MESSAGE =
-  "Unfortunately ItemTraxx is currently unavailable. We apologize for any inconvenience and are working to restore access as soon as possible. Please see the status page for more information";
+  "Unfortunately ItemTraxx is currently unavailable. We apologize for any inconvenience and are working to restore access as soon as possible. Please see the status page for more information.";
+
+const DEV_BYPASS_HOSTS = new Set([
+  "dennis-dev.itemtraxx.com",
+  "leo-dev.itemtraxx.com",
+  "dev.itemtraxx.com",
+  "preview.itemtraxx.com",
+  "staging.itemtraxx.com",
+]);
 
 const isLocalhostHost = (hostname: string) => {
   if (!hostname) return false;
+  if (DEV_BYPASS_HOSTS.has(hostname)) return true;
   if (
     hostname === "localhost" || hostname === "127.0.0.1" ||
-    hostname === "0.0.0.0"
+    hostname === "0.0.0.0" || hostname.endsWith(".localhost")
   ) {
     return true;
   }

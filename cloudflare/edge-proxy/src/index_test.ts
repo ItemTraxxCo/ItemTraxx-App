@@ -342,6 +342,81 @@ Deno.test("system-status remains a 200 JSON response during edge downtime", asyn
   }
 });
 
+Deno.test("spoofed Referer without Origin does not bypass edge downtime", async () => {
+  for (const flag of ["ITX_MAINTENANCE_ENABLED", "ITX_KILLSWITCH_ENABLED"] as const) {
+    for (const referer of ["http://localhost:5173/", "https://dev.itemtraxx.com/"]) {
+      const response = await worker.fetch(
+        new Request("https://edge.itemtraxx.com/rest/v1/workspaces", {
+          headers: { referer },
+        }),
+        { [flag]: "true", TRUST_LOCAL_ORIGINS: "false" } as Env,
+        executionContext,
+      );
+      if (response.status !== 503) {
+        throw new Error(
+          `${flag} with Referer ${referer} and no Origin must return 503, got ${response.status}`,
+        );
+      }
+    }
+  }
+});
+
+Deno.test("dev domains and trusted localhost origins bypass both killswitch and maintenance", async () => {
+  for (const flag of ["ITX_MAINTENANCE_ENABLED", "ITX_KILLSWITCH_ENABLED"] as const) {
+    const devResponse = await worker.fetch(
+      new Request("https://edge.itemtraxx.com/rest/v1/workspaces", {
+        headers: { origin: "https://dev.itemtraxx.com" },
+      }),
+      { [flag]: "true", TRUST_LOCAL_ORIGINS: "false" } as Env,
+      executionContext,
+    );
+    if (devResponse.status === 503) {
+      throw new Error(`${flag} should allow dev.itemtraxx.com to bypass edge downtime`);
+    }
+
+    const trustedLocalResponse = await worker.fetch(
+      new Request("https://edge.itemtraxx.com/rest/v1/workspaces", {
+        headers: { origin: "http://localhost:5173" },
+      }),
+      { [flag]: "true", TRUST_LOCAL_ORIGINS: "true" } as Env,
+      executionContext,
+    );
+    if (trustedLocalResponse.status === 503) {
+      throw new Error(`${flag} should allow localhost to bypass when TRUST_LOCAL_ORIGINS=true`);
+    }
+
+    const untrustedLocalResponse = await worker.fetch(
+      new Request("https://edge.itemtraxx.com/rest/v1/workspaces", {
+        headers: { origin: "http://localhost:5173" },
+      }),
+      { [flag]: "true", TRUST_LOCAL_ORIGINS: "false" } as Env,
+      executionContext,
+    );
+    if (untrustedLocalResponse.status !== 403) {
+      throw new Error(
+        `${flag} should reject localhost when TRUST_LOCAL_ORIGINS=false, got ${untrustedLocalResponse.status}`,
+      );
+    }
+  }
+});
+
+Deno.test("internal auth admin bridge is not masked by edge downtime when secret header is supplied", async () => {
+  const response = await worker.fetch(
+    new Request("https://edge.itemtraxx.com/api/auth/internal-admin", {
+      method: "POST",
+      headers: { "x-itx-internal-auth": "wrong-secret" },
+    }),
+    {
+      ITX_MAINTENANCE_ENABLED: "true",
+      ITX_INTERNAL_AUTH_SECRET: "expected-secret",
+    } as Env,
+    executionContext,
+  );
+  if (response.status !== 401) {
+    throw new Error(`Expected internal-admin bridge to enforce secret auth (401), got ${response.status}`);
+  }
+});
+
 Deno.test("rate limits public email sign-in before reading its form body", async () => {
   let bodyRead = false;
   let limiterKey = "";

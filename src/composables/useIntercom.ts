@@ -1,6 +1,9 @@
 import { onScopeDispose, watch } from "vue";
 import type { IntercomUser } from "../services/intercomService";
-import { SUPPORT_MESSENGER_OPEN_EVENT } from "../services/supportMessengerEvent";
+import {
+  SUPPORT_MESSENGER_OPEN_EVENT,
+  type SupportMessengerOpenDetail,
+} from "../services/supportMessengerEvent";
 
 type IntercomAuthState = {
   isInitialized: boolean;
@@ -79,13 +82,16 @@ export const useIntercom = (auth: IntercomAuthState) => {
     scheduleAnonymousBoot();
   };
 
-  const openSupport = async () => {
+  const openSupport = async (options?: SupportMessengerOpenDetail) => {
     const service = await loadIntercomService();
-    return service.openIntercomMessenger(signedInUser());
+    return options?.allowAnonymousFallback
+      ? service.openIntercomMessenger(signedInUser(), { allowAnonymousFallback: true })
+      : service.openIntercomMessenger(signedInUser());
   };
 
-  const handleOpenRequest = () => {
-    void openSupport();
+  const handleOpenRequest = (event: Event) => {
+    const detail = (event as CustomEvent<SupportMessengerOpenDetail | undefined>).detail;
+    void openSupport(detail);
   };
   if (typeof window !== "undefined") {
     window.addEventListener(SUPPORT_MESSENGER_OPEN_EVENT, handleOpenRequest);

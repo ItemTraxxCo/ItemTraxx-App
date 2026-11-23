@@ -150,7 +150,9 @@ check_status_endpoint() {
       return 0
     fi
 
-    if [ "$status" -eq 503 ] && jq -e '.kill_switch.enabled == true' /tmp/itx_status_body.json >/dev/null 2>&1; then
+    if [ "$status" -eq 503 ] && jq -e '
+      .kill_switch.enabled == true or .maintenance.enabled == true or .status == "maintenance"
+    ' /tmp/itx_status_body.json >/dev/null 2>&1; then
       skip_for_kill_switch "${EDGE_URL}/system-status"
     fi
 

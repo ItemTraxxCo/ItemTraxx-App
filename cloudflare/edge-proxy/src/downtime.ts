@@ -1,10 +1,13 @@
-import { isUnavailableBypassHost } from "../../../src/utils/unavailableBypass.ts";
+import {
+  isLocalUnavailableBypassHost,
+  isNamedUnavailableBypassHost,
+} from "../../../src/utils/unavailableBypass.ts";
 import { buildJson } from "./responses.ts";
 
 export const DEFAULT_MAINTENANCE_MESSAGE =
   "Maintenance is currently in progress. Please see the status page for more information.";
 export const DEFAULT_KILLSWITCH_MESSAGE =
-  "Unfortunately ItemTraxx is currently unavailable. We apologize for any inconvenience and are working to restore access as soon as possible. Please see the status page for more information";
+  "Unfortunately ItemTraxx is currently unavailable. We apologize for any inconvenience and are working to restore access as soon as possible. Please see the status page for more information.";
 export const STATUS_PAGE_URL = "https://status.itemtraxx.com";
 
 export type DowntimeMode = "killswitch" | "maintenance";
@@ -36,12 +39,15 @@ export const resolveDowntimeState = (env: Env): DowntimeState | null => {
 export const isSystemStatusRequest = (pathname: string) =>
   /^\/functions\/(?:v1\/)?system-status\/?$/i.test(pathname);
 
-export const isUnavailableBypassRequest = (request: Request) => {
-  const source = request.headers.get("origin") ??
-    request.headers.get("referer");
-  if (!source) return false;
+export const isUnavailableBypassRequest = (request: Request, env: Env) => {
+  const origin = request.headers.get("origin");
+  if (!origin) return false;
   try {
-    return isUnavailableBypassHost(new URL(source).hostname);
+    const hostname = new URL(origin).hostname;
+    if (isNamedUnavailableBypassHost(hostname)) return true;
+    const trustLocalOrigins =
+      (env.TRUST_LOCAL_ORIGINS ?? "").trim().toLowerCase() === "true";
+    return trustLocalOrigins && isLocalUnavailableBypassHost(hostname);
   } catch {
     return false;
   }
@@ -73,7 +79,6 @@ export const buildSystemStatusResponse = (
   const responseHeaders = new Headers({
     "cache-control": "no-store",
   });
-  responseHeaders.set("content-type", "application/json");
 
   const body = state.mode === "killswitch"
     ? {

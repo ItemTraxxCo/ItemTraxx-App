@@ -1,3 +1,5 @@
+import { edgeDowntimeState } from "../store/edgeDowntime";
+
 const AVAILABILITY_SIGNAL_MAX_AGE_MS = 10 * 60 * 1000;
 
 type SystemStatusSignal = {
@@ -47,6 +49,7 @@ export const observeSystemStatusUnavailable = () => {
  * or intentionally unavailable. Real uncaught exceptions are not filtered.
  */
 export const isExpectedServiceDisruption = () => {
+  if (edgeDowntimeState.value !== null) return true;
   if (typeof window !== "undefined") {
     const path = window.location.pathname.replace(/\/+$/, "") || "/";
     if (path === "/unavailable") return true;

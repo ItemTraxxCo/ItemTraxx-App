@@ -282,9 +282,18 @@ export default {
         if (systemStatusRequest && downtime) {
           return buildSystemStatusResponse(downtime, headers, requestId);
         }
-        const bypassMaintenance = downtime?.mode === "maintenance" &&
-          isUnavailableBypassRequest(tracedRequest);
-        if (downtime && !bypassMaintenance && !systemStatusRequest) {
+        const bypassDowntime = Boolean(downtime) &&
+          isUnavailableBypassRequest(tracedRequest, env);
+        const isInternalAuthAdminBridge =
+          (url.pathname === "/api/auth/internal-admin" ||
+            url.pathname === "/api/internal/auth-admin") &&
+          Boolean(tracedRequest.headers.get("x-itx-internal-auth"));
+        if (
+          downtime &&
+          !bypassDowntime &&
+          !systemStatusRequest &&
+          !isInternalAuthAdminBridge
+        ) {
           return buildDowntimeResponse(
             downtime,
             headers,
@@ -427,9 +436,6 @@ export default {
           return response;
         }
 
-        // REST and RPC requests return from this branch, so they must be checked
-        // before dispatch. Otherwise a kill-switch incident still permits table
-        // reads and direct audit-log writes through the PostgREST pass-through.
         if (isBlockedRpcProxyPath(url.pathname)) {
           return buildError(
             403,

@@ -545,14 +545,14 @@ test.describe("Public surfaces", () => {
     );
   });
 
-  test("maintenance blocks non-exempt routes and preserves its cached message", async ({ page }) => {
+  test("maintenance blocks non-exempt routes with the shared downtime screen", async ({ page }) => {
     await page.route(/\/functions(?:\/v1)?\/system-status(?:\?.*)?$/, async (route) => {
       await route.fulfill({
         status: 200,
         headers: { "access-control-allow-origin": nonDevE2eOrigin },
         contentType: "application/json",
         body: JSON.stringify({
-          status: "degraded",
+          status: "maintenance",
           checked_at: "2026-07-13T12:00:00.000Z",
           maintenance: {
             enabled: true,
@@ -572,29 +572,23 @@ test.describe("Public surfaces", () => {
     await expect(maintenanceBanner.locator("span")).toHaveText(
       "Scheduled inventory maintenance",
     );
-    const overlay = page.getByRole("alertdialog").filter({ hasText: "We’re performing maintenance" });
+    const overlay = page.getByRole("alertdialog").filter({ hasText: "We’ll be back soon" });
     await expect(overlay).toBeVisible();
+    await expect(overlay).toContainText("Scheduled inventory maintenance");
     await expect(overlay.getByRole("link", { name: "View Live Status" })).toHaveAttribute(
       "href",
-      "https://status.itemtraxx.com/?ref=maintscreen",
+      "https://status.itemtraxx.com",
     );
-    await expect.poll(() =>
-      page.evaluate(() => JSON.parse(localStorage.getItem("itemtraxx-maintenance-state") ?? "null")),
-    ).toEqual({
-      enabled: true,
-      message: "Scheduled inventory maintenance",
-      updatedAt: "2026-07-13T12:00:00.000Z",
-    });
   });
 
-  test("kill switch keeps public home available and sends other routes to unavailable", async ({ page }) => {
+  test("kill switch renders the shared downtime overlay and routes to unavailable", async ({ page }) => {
     await page.route(/\/functions(?:\/v1)?\/system-status(?:\?.*)?$/, async (route) => {
       await route.fulfill({
         status: 200,
         headers: { "access-control-allow-origin": nonDevE2eOrigin },
         contentType: "application/json",
         body: JSON.stringify({
-          status: "operational",
+          status: "major_outage",
           kill_switch: { enabled: true, message: "" },
           maintenance: { enabled: false, message: "" },
         }),
@@ -607,21 +601,21 @@ test.describe("Public surfaces", () => {
       router.replace = (() => Promise.resolve()) as typeof router.replace;
     });
     await navigateApp(page, "/login");
-    const overlay = page.getByRole("alertdialog").filter({ hasText: "currently unavailable" });
+    const overlay = page.getByRole("alertdialog").filter({ hasText: "We’ll be back soon" });
     await expect(overlay).toBeVisible();
-    await expect(overlay.getByRole("link", { name: "View status page" })).toHaveAttribute(
+    await expect(overlay.getByRole("link", { name: "View Live Status" })).toHaveAttribute(
       "href",
-      "https://status.itemtraxx.com/?ref=killswitch",
+      "https://status.itemtraxx.com",
     );
     await expect(overlay).toContainText(
-      "Please see the status page (https://status.itemtraxx.com/?ref=killswitch) for more information.",
+      "Please see the status page for more information.",
     );
 
     await page.goto(`${nonDevE2eOrigin}/`);
-    await expect(page).toHaveURL(`${nonDevE2eOrigin}/`);
+    await expect(page).toHaveURL(`${nonDevE2eOrigin}/unavailable`);
     await page.goto(`${nonDevE2eOrigin}/login`);
     await expect(page).toHaveURL(`${nonDevE2eOrigin}/unavailable`);
-    await expect(page.getByRole("heading", { name: /currently unavailable/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "We’ll be back soon" })).toBeVisible();
   });
 
   test("explicit non-production hosts bypass unavailable-state presentation", async ({ page }) => {
@@ -676,7 +670,7 @@ test.describe("Public surfaces", () => {
     });
 
     const dialogs = page.getByRole("alertdialog");
-    await expect(dialogs.filter({ hasText: "We’re performing maintenance" })).toBeVisible();
+    await expect(dialogs.filter({ hasText: "We’ll be back soon" })).toBeVisible();
     await expect(dialogs.filter({ hasText: "Update Available" })).toHaveCount(0);
     await expect(dialogs.filter({ hasText: "Session Ended" })).toHaveCount(0);
   });

@@ -278,7 +278,7 @@ test.describe("Protected route smoke tests", () => {
     await expect(banner).toBeVisible();
     await expect(banner.getByRole("link", { name: "View status" })).toHaveAttribute(
       "href",
-      "https://status.itemtraxx.com/?ref=bcastlink",
+      "https://status.itemtraxx.com",
     );
     await banner.getByRole("button").click();
     await expect(banner).toHaveCount(0);

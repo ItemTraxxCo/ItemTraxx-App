@@ -7,30 +7,19 @@ permissions:
 on:
   workflow_dispatch:
     inputs:
-      enabled:
-        description: "Enable or disable the kill switch."
+      mode:
+        description: "Edge downtime mode to apply (disabled clears both kill switch and maintenance)."
         required: true
         type: choice
-        default: disable
+        default: disabled
         options:
-          - enable
-          - disable
+          - disabled
+          - maintenance
+          - killswitch
       message:
-        description: "Kill-switch message shown in the blocking response."
+        description: "Optional custom message for the selected mode (blank uses the mode default)."
         required: false
-        default: "Unfortunately ItemTraxx is currently unavailable. We apologize for any inconvenience and are working to restore access as soon as possible. Please see the status page for more information"
-      maintenance_enabled:
-        description: "Enable or disable maintenance mode at the edge."
-        required: true
-        type: choice
-        default: disable
-        options:
-          - enable
-          - disable
-      maintenance_message:
-        description: "Maintenance message shown in the blocking response."
-        required: false
-        default: "Maintenance is currently in progress. Please see the status page for more information."
+        default: ""
 
 concurrency:
   group: manage-kill-switch
@@ -106,36 +95,44 @@ jobs:
       - name: Install dependencies
         run: npm ci --ignore-scripts
 
-      - name: Resolve kill-switch inputs
+      - name: Resolve downtime inputs
         id: config
         env:
-          INPUT_ENABLED: ${{ github.event.inputs.enabled }}
+          INPUT_MODE: ${{ github.event.inputs.mode }}
           INPUT_MESSAGE: ${{ github.event.inputs.message }}
-          INPUT_MAINTENANCE_ENABLED: ${{ github.event.inputs.maintenance_enabled }}
-          INPUT_MAINTENANCE_MESSAGE: ${{ github.event.inputs.maintenance_message }}
         run: |
           set -euo pipefail
 
-          if [ "$INPUT_ENABLED" = "enable" ]; then
-            killswitch_enabled="true"
-          else
-            killswitch_enabled="false"
-          fi
+          default_killswitch_message="Unfortunately ItemTraxx is currently unavailable. We apologize for any inconvenience and are working to restore access as soon as possible. Please see the status page for more information."
+          default_maintenance_message="Maintenance is currently in progress. Please see the status page for more information."
 
-          if [ "$INPUT_MAINTENANCE_ENABLED" = "enable" ]; then
-            maintenance_enabled="true"
-          else
-            maintenance_enabled="false"
-          fi
+          normalized_message="$(printf '%s' "$INPUT_MESSAGE" | tr '\n' ' ' | sed -E 's/[[:space:]]+/ /g; s/^ //; s/ $//')"
 
-          killswitch_message="$(printf '%s' "$INPUT_MESSAGE" | tr '\n' ' ' | sed -E 's/[[:space:]]+/ /g; s/^ //; s/ $//')"
-          if [ -z "$killswitch_message" ]; then
-            killswitch_message="Unfortunately ItemTraxx is currently unavailable. We apologize for any inconvenience and are working to restore access as soon as possible. Please see the status page for more information"
-          fi
-          maintenance_message="$(printf '%s' "$INPUT_MAINTENANCE_MESSAGE" | tr '\n' ' ' | sed -E 's/[[:space:]]+/ /g; s/^ //; s/ $//')"
-          if [ -z "$maintenance_message" ]; then
-            maintenance_message="Maintenance is currently in progress. Please see the status page for more information."
-          fi
+          killswitch_enabled="false"
+          maintenance_enabled="false"
+          killswitch_message="$default_killswitch_message"
+          maintenance_message="$default_maintenance_message"
+
+          case "$INPUT_MODE" in
+            killswitch)
+              killswitch_enabled="true"
+              if [ -n "$normalized_message" ]; then
+                killswitch_message="$normalized_message"
+              fi
+              ;;
+            maintenance)
+              maintenance_enabled="true"
+              if [ -n "$normalized_message" ]; then
+                maintenance_message="$normalized_message"
+              fi
+              ;;
+            disabled)
+              ;;
+            *)
+              echo "Unsupported edge downtime mode: $INPUT_MODE" >&2
+              exit 1
+              ;;
+          esac
 
           {
             echo "killswitch_enabled=$killswitch_enabled"

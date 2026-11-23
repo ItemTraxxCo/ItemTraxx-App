@@ -51,7 +51,7 @@
         <button
           class="downtime-screen-action downtime-screen-action-support"
           type="button"
-          @click="requestSupportMessenger"
+          @click="openSupportChat"
         >
           Open Support Chat
         </button>
@@ -85,6 +85,10 @@ const emit = defineEmits<{
   reload: [];
   toggleTheme: [];
 }>();
+
+const openSupportChat = () => {
+  requestSupportMessenger({ allowAnonymousFallback: true });
+};
 </script>
 
 <style scoped>

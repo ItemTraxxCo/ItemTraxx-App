@@ -47,7 +47,7 @@
         :maintenance-visible="showMaintenanceOverlay"
         :maintenance-message="maintenanceMessage"
         :status-page-url="statusPageUrl"
-        :version-visible="showVersionOverlay && !showMaintenanceOverlay && !isUnavailableRoute"
+        :version-visible="showVersionOverlay && !showMaintenanceOverlay && !showKillSwitchOverlay && !isUnavailableRoute"
         :current-version="appVersion"
         :latest-version="latestVersion"
         :session-visible="sessionTermination.visible && !showMaintenanceOverlay && !showKillSwitchOverlay && !isUnavailableRoute"
@@ -161,7 +161,7 @@ const dismissedIncidentId = ref(localStorage.getItem("itemtraxx-incident-dismiss
 const maintenanceEnabled = ref(false);
 const maintenanceMessage = ref("Maintenance is currently in progress. Please see the status page for more information.");
 const killSwitchEnabled = ref(false);
-const killSwitchMessage = ref("Unfortunately ItemTraxx is currently unavailable. We apologize for any inconvenience and are working to restore access as soon as possible. Please see the status page for more information");
+const killSwitchMessage = ref("Unfortunately ItemTraxx is currently unavailable. We apologize for any inconvenience and are working to restore access as soon as possible. Please see the status page for more information.");
 const statusPageUrl = computed(() => edgeDowntimeState.value?.statusPageUrl || STATUS_PAGE_URL);
 const backendUnavailable = ref(false);
 const showPageLoading = ref(false);
@@ -215,8 +215,7 @@ const showMaintenanceBanner = computed(() => maintenanceEnabled.value && !isUnav
 const showMaintenanceOverlay = computed(() => {
   if (isUnavailableBypass.value || !maintenanceEnabled.value) return false;
   const name = String(route.name || "");
-  if (["public-unavailable", "public-access-denied", "not-found", "super-auth", "internal-auth"].includes(name) || name.startsWith("internal-")) return false;
-  return !name.startsWith("super-admin-");
+  return !["public-unavailable", "public-access-denied", "not-found"].includes(name);
 });
 const showKillSwitchOverlay = computed(() => !isUnavailableBypass.value && !isKillSwitchAllowedRoute.value && killSwitchEnabled.value);
 const hasTopBanners = computed(() => showMaintenanceBanner.value || showBroadcast.value || showIncidentBanner.value);
@@ -291,7 +290,7 @@ const applySystemStatus = () => {
       ? payload.kill_switch.message.trim()
       : typeof payload.incident_summary === "string" && payload.incident_summary.trim()
       ? payload.incident_summary.trim()
-      : "Unfortunately ItemTraxx is currently unavailable. We apologize for any inconvenience and are working to restore access as soon as possible. Please see the status page for more information";
+      : "Unfortunately ItemTraxx is currently unavailable. We apologize for any inconvenience and are working to restore access as soon as possible. Please see the status page for more information.";
   }
   const broadcast = payload.broadcast;
   activeBroadcast.value = broadcast?.enabled && typeof broadcast.message === "string" && broadcast.message.trim() ? {

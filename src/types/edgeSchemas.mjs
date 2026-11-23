@@ -34,14 +34,6 @@ const tenantPlanCodeSchema = z.enum([
   "individual_yearly",
   "individual_monthly",
 ]);
-const districtSubscriptionPlanSchema = z.enum([
-  "district_core",
-  "district_growth",
-  "district_enterprise",
-  "organization_starter",
-  "organization_scale",
-  "organization_enterprise",
-]);
 const districtBillingStatusSchema = z.enum(["draft", "active", "past_due", "canceled"]);
 const tenantAdminLoginMethodSchema = z.string().max(128).regex(
   /^(?:password|magic_link|session_handoff|[a-z0-9-]+)$/,
@@ -82,12 +74,6 @@ const tenantNotificationSchema = z.object({
     })
   ),
   feature_flags: tenantFeatureFlagsSchema,
-  maintenance: z
-    .object({
-      enabled: z.boolean(),
-      message: z.string(),
-    })
-    .nullable(),
   recent_status_events: z.array(
     z.object({
       id: z.string(),
@@ -249,86 +235,6 @@ const superIndividualAccountSchema = superWorkspaceSchema.omit({ slug: true }).e
   billing_status: districtBillingStatusSchema.nullable().optional(),
   renewal_date: z.string().nullable().optional(),
   invoice_reference: z.string().nullable().optional(),
-});
-
-const superDistrictSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  slug: z.string(),
-  support_email: z.string().nullable().optional(),
-  contact_name: z.string().nullable().optional(),
-  is_active: z.boolean(),
-  created_at: z.string(),
-  tenants_count: z.number().int().nonnegative().optional(),
-  subscription_plan: districtSubscriptionPlanSchema.nullable().optional(),
-  billing_status: districtBillingStatusSchema.nullable().optional(),
-  renewal_date: z.string().nullable().optional(),
-  billing_email: z.string().nullable().optional(),
-  invoice_reference: z.string().nullable().optional(),
-});
-
-const superDistrictDetailSchema = z.object({
-  district: superDistrictSchema,
-  workspaces: z.array(superWorkspaceSchema),
-  support_requests: z.array(
-    z.object({
-      id: z.string(),
-      requester_email: z.string().nullable().optional(),
-      requester_name: z.string().nullable().optional(),
-      subject: z.string(),
-      message: z.string(),
-      priority: z.enum(["low", "normal", "high", "urgent"]),
-      status: z.enum(["open", "in_progress", "resolved"]),
-      created_at: z.string(),
-    })
-  ),
-  tenant_metrics: z.array(
-    z.object({
-      workspace_id: z.string(),
-      workspace_name: z.string(),
-      item_total: z.number().int().nonnegative(),
-      borrowers_total: z.number().int().nonnegative(),
-      active_checkouts: z.number().int().nonnegative(),
-      overdue_items: z.number().int().nonnegative(),
-      transactions_7d: z.number().int().nonnegative(),
-    })
-  ),
-  traffic: z.object({
-    checkout_24h: z.number().int().nonnegative(),
-    return_24h: z.number().int().nonnegative(),
-    active_tenants_24h: z.number().int().nonnegative(),
-    events_24h: z.number().int().nonnegative(),
-  }),
-  traffic_by_hour: z.array(
-    z.object({ hour: z.string(), checkout: z.number().int().nonnegative(), return: z.number().int().nonnegative() })
-  ),
-  recent_events: z.array(
-    z.object({
-      workspace_id: z.string().nullable(),
-      workspace_name: z.string(),
-      action_type: z.enum(["checkout", "return"]),
-      action_time: z.string(),
-      item_name: z.string().nullable(),
-      item_barcode: z.string().nullable(),
-      borrower_username: z.string().nullable(),
-      borrower_id: z.string().nullable(),
-    })
-  ),
-  needs_attention: z.array(
-    z.object({
-      key: z.string(),
-      level: z.enum(["high", "medium", "low"]),
-      title: z.string(),
-      count: z.number().int().nonnegative(),
-    })
-  ),
-  usage: z.object({
-    item_total: z.number().int().nonnegative(),
-    borrowers_total: z.number().int().nonnegative(),
-    active_checkouts: z.number().int().nonnegative(),
-    overdue_items: z.number().int().nonnegative(),
-    transactions_7d: z.number().int().nonnegative(),
-  }),
 });
 
 const superWorkspaceRequestSchema = z.discriminatedUnion("action", [
@@ -904,62 +810,6 @@ const superAdminResponseSchemas = {
   update_super_admin_email: edgeEnvelopeSchema(superAdminProfileSchema),
   send_super_admin_reset: edgeEnvelopeSchema(z.object({ success: z.boolean() })),
 };
-
-
-const districtDashboardDistrictSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  slug: z.string(),
-  support_email: z.string().nullable().optional(),
-  contact_name: z.string().nullable().optional(),
-  is_active: z.boolean(),
-  subscription_plan: districtSubscriptionPlanSchema.nullable().optional(),
-  billing_status: districtBillingStatusSchema.nullable().optional(),
-  renewal_date: z.string().nullable().optional(),
-  billing_email: z.string().nullable().optional(),
-  invoice_reference: z.string().nullable().optional(),
-});
-
-const districtDashboardTenantSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  access_code: z.string(),
-  status: tenantStatusSchema,
-  created_at: z.string(),
-  primary_admin_profile_id: z.string().nullable().optional(),
-  primary_admin_email: z.string().nullable().optional(),
-});
-
-const districtDashboardResponseSchema = z.object({
-  data: z.object({
-    district: districtDashboardDistrictSchema,
-    support_requests: z.array(z.object({
-      id: z.string(), requester_email: z.string().nullable().optional(), requester_name: z.string().nullable().optional(), subject: z.string(), message: z.string(), priority: z.enum(["low","normal","high","urgent"]), status: z.enum(["open","in_progress","resolved"]), created_at: z.string()
-    })),
-    tenant_metrics: z.array(z.object({
-      workspace_id: z.string(), workspace_name: z.string(), item_total: z.number().int().nonnegative(), borrowers_total: z.number().int().nonnegative(), active_checkouts: z.number().int().nonnegative(), overdue_items: z.number().int().nonnegative(), transactions_7d: z.number().int().nonnegative()
-    })),
-    traffic: z.object({ checkout_24h: z.number().int().nonnegative(), return_24h: z.number().int().nonnegative(), active_tenants_24h: z.number().int().nonnegative(), events_24h: z.number().int().nonnegative() }),
-    traffic_by_hour: z.array(z.object({ hour: z.string(), checkout: z.number().int().nonnegative(), return: z.number().int().nonnegative() })),
-    recent_events: z.array(z.object({ workspace_id: z.string().nullable(), workspace_name: z.string(), action_type: z.enum(["checkout","return"]), action_time: z.string(), item_name: z.string().nullable(), item_barcode: z.string().nullable(), borrower_username: z.string().nullable(), borrower_id: z.string().nullable() })),
-    needs_attention: z.array(z.object({ key: z.string(), level: z.enum(["high","medium","low"]), title: z.string(), count: z.number().int().nonnegative() })),
-    workspaces: z.array(districtDashboardTenantSchema),
-    usage: z.object({ item_total: z.number().int().nonnegative(), borrowers_total: z.number().int().nonnegative(), active_checkouts: z.number().int().nonnegative(), overdue_items: z.number().int().nonnegative(), transactions_7d: z.number().int().nonnegative() })
-  })
-});
-
-const districtHandoffRequestSchema = z.discriminatedUnion("action", [
-  z.object({ action: z.literal("create"), auth_email: z.string().email(), password: z.string().min(1), district_slug: z.string().min(1) }),
-  z.object({ action: z.literal("create_admin"), email: z.string().email(), password: z.string().min(1) }),
-  z.object({ action: z.literal("consume"), code: z.string().min(1) }),
-]);
-
-const districtHandoffResponseSchemas = {
-  create: z.object({ code: z.string(), expires_at: z.string() }),
-  create_admin: z.object({ code: z.string().nullable(), district_slug: z.string().nullable(), role: z.enum(["workspace_admin","workspace_admin"]), expires_at: z.string().optional(), root_only: z.boolean().optional() }),
-  consume: z.object({ access_token: z.string(), refresh_token: z.string(), district_slug: z.string() }),
-};
-
 const contactSalesPlanSchema = z.enum(["workspace_core","workspace_growth","workspace_enterprise","education","custom","individual_yearly","individual_monthly","other"]);
 const contactSalesIntentSchema = z.enum(["sales","demo"]);
 

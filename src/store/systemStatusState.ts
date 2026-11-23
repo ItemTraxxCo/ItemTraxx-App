@@ -18,7 +18,11 @@ let timer: number | null = null;
 const statusLabel = computed(() => {
   if (!state.hasResult) return state.refreshedAt > 0 ? "Unknown" : "Loading...";
   if (state.responseOk && state.payload.status === "operational") return "Running";
-  if (state.responseStatus >= 500 || state.payload.status === "down") return "Down";
+  if (state.payload.status === "maintenance") return "Maintenance";
+  if (
+    state.responseStatus >= 500 ||
+    ["down", "major_outage", "unavailable"].includes(state.payload.status ?? "")
+  ) return "Down";
   return "Degraded";
 });
 
@@ -26,7 +30,7 @@ const statusClass = computed<
   "status-ok" | "status-warn" | "status-down" | "status-unknown"
 >(() => {
   if (statusLabel.value === "Running") return "status-ok";
-  if (statusLabel.value === "Degraded") return "status-warn";
+  if (statusLabel.value === "Degraded" || statusLabel.value === "Maintenance") return "status-warn";
   if (statusLabel.value === "Down") return "status-down";
   return "status-unknown";
 });

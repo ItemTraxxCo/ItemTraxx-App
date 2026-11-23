@@ -176,9 +176,8 @@ const routes: RouteRecordRaw[] = [
   },
   {
     path: "/changelog",
-    name: "public-changelog",
-    component: () => import("../pages/ChangelogPage.vue"),
-    meta: { public: true, title: "Changelog | ItemTraxx" },
+    name: "public-changelog-redirect",
+    redirect: "/index/changelog",
   },
   {
     path: "/index",

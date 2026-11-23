@@ -4,9 +4,13 @@
  * dispatching this window event. Kept in its own tiny module so the heavier
  * Intercom service can be loaded lazily.
  */
+export type SupportMessengerOpenDetail = {
+  allowAnonymousFallback?: boolean;
+};
+
 export const SUPPORT_MESSENGER_OPEN_EVENT = "itemtraxx:open-support";
 
-export const requestSupportMessenger = () => {
+export const requestSupportMessenger = (detail?: SupportMessengerOpenDetail) => {
   if (typeof window === "undefined") return;
-  window.dispatchEvent(new CustomEvent(SUPPORT_MESSENGER_OPEN_EVENT));
+  window.dispatchEvent(new CustomEvent<SupportMessengerOpenDetail | undefined>(SUPPORT_MESSENGER_OPEN_EVENT, { detail }));
 };

@@ -72,7 +72,6 @@ export type AdminOpsContext = {
   workspacePolicy: TenantPolicyRow | null;
   checkoutDueHours: number;
   featureFlags: TenantFeatureFlags;
-  maintenance: { enabled: boolean; message: string };
   workspaceUpdates: RuntimeUpdateItem[];
   jsonResponse: JsonResponse;
 };

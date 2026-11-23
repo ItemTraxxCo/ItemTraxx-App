@@ -16,6 +16,7 @@ import { readJsonBody } from "../_shared/requestBody.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 import { logError, withRequestSpan } from "../_shared/observability.ts";
 import { sha256Hex } from "../_shared/sha256.ts";
+import { hashBorrowerId } from "../_shared/encryptedBorrower.ts";
 import { buildQuickReturnAuditRecord } from "./adminAudit.ts";
 
 const baseCorsHeaders = {
@@ -33,29 +34,6 @@ type RateLimitResult = {
 const CHECKOUT_ACTIONS = new Set(
   ["checkout", "return", "auto", "admin_return", "quick_return"] as const,
 );
-
-const isLocalhostMaintenanceBypassRequest = (req: Request) => {
-  if (
-    (Deno.env.get("ITX_ALLOW_LOCALHOST_MAINTENANCE_BYPASS") ?? "")
-      .toLowerCase() !== "true"
-  ) {
-    return false;
-  }
-  const origin = req.headers.get("origin");
-  if (!origin) return false;
-  try {
-    const hostname = new URL(origin).hostname.toLowerCase();
-    if (
-      hostname === "localhost" || hostname === "127.0.0.1" ||
-      hostname === "0.0.0.0"
-    ) {
-      return true;
-    }
-    return false;
-  } catch {
-    return false;
-  }
-};
 
 serve((req) => withRequestSpan(req, "POST /functions/checkoutReturn", async (span, requestId) => {
   const { hasOrigin, originAllowed, headers } = resolveCorsHeaders(req, baseCorsHeaders);
@@ -253,39 +231,19 @@ serve((req) => withRequestSpan(req, "POST /functions/checkoutReturn", async (spa
       }
     }
 
-    const { data: maintenanceRow, error: maintenanceError } = await adminClient
-      .from("app_runtime_config")
-      .select("value")
-      .eq("key", "maintenance_mode")
-      .maybeSingle();
-    if (maintenanceError) {
-      return internalQueryFailure("load_maintenance_config", maintenanceError);
-    }
-    const maintenanceValue =
-      maintenanceRow?.value && typeof maintenanceRow.value === "object"
-        ? (maintenanceRow.value as Record<string, unknown>)
-        : {};
-    if (
-      maintenanceValue.enabled === true &&
-      !isLocalhostMaintenanceBypassRequest(req)
-    ) {
-      return jsonResponse(503, {
-        error: typeof maintenanceValue.message === "string" &&
-            maintenanceValue.message.trim()
-          ? maintenanceValue.message.trim()
-          : "Maintenance mode enabled.",
-      });
-    }
-
     let borrower: { id: string; workspace_id: string; access_mode: string } | null = null;
 
     if (!isAdminReturn && !isQuickReturn) {
       const borrowerId = requireText(borrower_id, { maxLen: 32 });
 
+      const encryptedMode = Deno.env.get("ITX_ENCRYPTED_BORROWERS_LOCAL") === "true";
+      const lookupValue = encryptedMode
+        ? await hashBorrowerId(callerProfile.workspace_id, borrowerId, Deno.env.get("ITX_SGW_INTERNAL_SECRET") ?? "")
+        : borrowerId;
       const { data: borrowerData, error: borrowerError } = await adminClient
         .from("borrowers")
         .select("id, workspace_id, access_mode")
-        .eq("borrower_id", borrowerId)
+        .eq(encryptedMode ? "borrower_id_hash" : "borrower_id", lookupValue)
         .eq("workspace_id", callerProfile.workspace_id)
         .is("deleted_at", null)
         .maybeSingle();

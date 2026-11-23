@@ -358,3 +358,49 @@ describe("fetchBorrowerDetails", () => {
     expect(details.lastCheckout).toEqual({ action_time: "2026-01-01T00:00:00Z", item_name: null });
   });
 });
+
+describe('encrypted directory preview', () => {
+  it('loads bounded broker pages and fails closed on broker failure', async () => {
+    vi.stubEnv('VITE_ENCRYPTED_BORROWERS_LOCAL', 'true');
+    try {
+      mockedInvoke.mockResolvedValueOnce({ ok: true, status: 200, data: { data: { rows: [{ id: 'b-1', username: 'Alice', borrower_id: '123' }], hasMore: false } } } as never);
+      expect(await fetchBorrowerPage(0, 20)).toEqual({ rows: [{ id: 'b-1', username: 'Alice', borrower_id: '123' }], hasMore: false });
+      expect(mockedInvoke).toHaveBeenCalledWith('crypto-broker', { method: 'POST', body: { action: 'list', page: 0, page_size: 20, device_id: 'device-1' } });
+      mockedInvoke.mockResolvedValueOnce({ ok: false, status: 503, error: 'unavailable', data: null } as never);
+      await expect(fetchBorrowerPage(0, 20)).rejects.toThrow();
+      expect(mockedSelectPage).not.toHaveBeenCalled();
+    } finally { vi.unstubAllEnvs(); }
+  });
+});
+
+it('limits the encrypted directory buffer rather than accumulating an unbounded result', async () => {
+  vi.stubEnv('VITE_ENCRYPTED_BORROWERS_LOCAL', 'true');
+  try {
+    const batch = Array.from({ length: 50 }, (_, i) => ({ id: String(i), username: 'User', borrower_id: String(i) }));
+    mockedInvoke.mockResolvedValue({ ok: true, status: 200, data: { data: { rows: batch, hasMore: true } } } as never);
+    await expect(fetchBorrowers()).rejects.toThrow(/directory.*limit/i);
+    expect(mockedInvoke).toHaveBeenCalledTimes(201);
+  } finally { vi.unstubAllEnvs(); }
+});
+
+it('creates a named borrower through the encrypted broker without legacy plaintext writes', async () => {
+  mockedInvoke.mockResolvedValueOnce({ ok: true, status: 200, data: { data: { id: 'b-1', username: 'Ada Lovelace', first_name: 'Ada', last_name: 'Lovelace', borrower_id: 'ID123' } } } as never);
+  const result = await createBorrower({ workspace_id: WORKSPACE_ID, first_name: 'Ada', last_name: 'Lovelace', borrower_id: 'ID123', email: 'ada@example.test', access_mode: 'all', profile_ids: [] });
+  expect(result.first_name).toBe('Ada');
+  expect(mockedInvoke).toHaveBeenCalledWith('crypto-broker', { method: 'POST', body: { action: 'create', device_id: 'device-1', payload: { first_name: 'Ada', last_name: 'Lovelace', borrower_id: 'ID123', email: 'ada@example.test', access_mode: 'all', profile_ids: [] } } });
+});
+
+it('uses the encrypted broker for archived pages and restoration without a plaintext fallback', async () => {
+  vi.stubEnv('VITE_ENCRYPTED_BORROWERS_LOCAL', 'true');
+  try {
+    const row = { id: 'b-1', username: 'Ada Lovelace', borrower_id: 'ABC123' };
+    mockedInvoke.mockResolvedValueOnce({ ok: true, data: { data: { rows: [row], hasMore: false } } } as never)
+      .mockResolvedValueOnce({ ok: true, data: { data: row } } as never);
+    expect(await fetchDeletedBorrowers()).toEqual([row]);
+    expect(mockedInvoke).toHaveBeenNthCalledWith(1, 'crypto-broker', { method: 'POST', body: { action: 'list', archived: true, page: 0, page_size: 50, device_id: 'device-1' } });
+    expect(await restoreBorrower('b-1')).toEqual(row);
+    expect(mockedInvoke).toHaveBeenNthCalledWith(2, 'crypto-broker', { method: 'POST', body: { action: 'restore', id: 'b-1', device_id: 'device-1' } });
+    mockedInvoke.mockResolvedValueOnce({ ok: false, status: 503, error: 'unavailable' } as never);
+    await expect(fetchDeletedBorrowers()).rejects.toThrow();
+  } finally { vi.unstubAllEnvs(); }
+});

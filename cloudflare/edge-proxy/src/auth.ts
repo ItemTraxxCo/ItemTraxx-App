@@ -13,7 +13,7 @@ import {
   organizationRoles,
 } from "./auth/permissions.ts";
 import { parseCsv } from "./cors.ts";
-import { isItemTraxxHostname, trimTrailingSlash } from "./url.ts";
+import { trimTrailingSlash } from "./url.ts";
 import {
   createBetterAuthDataClient,
   supabaseBetterAuthAdapter,
@@ -575,7 +575,20 @@ export const getBetterAuth = (rawEnv: Env) => {
   const dataClient = createBetterAuthDataClient(supabaseUrl, serviceRoleKey);
   cachedDataClient = dataClient;
   const configuredUrl = new URL(env.BETTER_AUTH_URL);
-  const isProductionOrigin = configuredUrl.protocol === "https:" && isItemTraxxHostname(configuredUrl.hostname);
+  // Secure cookies follow the configured protocol, not the hostname, so
+  // preview deploys and custom subdomains keep the flag. Anything non-HTTPS
+  // outside localhost is a misconfiguration and worth a loud error.
+  const useSecureCookies = configuredUrl.protocol === "https:";
+  if (
+    !useSecureCookies &&
+    configuredUrl.hostname !== "localhost" &&
+    configuredUrl.hostname !== "127.0.0.1" &&
+    configuredUrl.hostname !== "[::1]"
+  ) {
+    console.error(
+      `BETTER_AUTH_URL (${env.BETTER_AUTH_URL}) is not HTTPS; Better Auth session cookies will be set without the Secure flag.`,
+    );
+  }
   const passkeyOrigins = parseCsv(env.BETTER_AUTH_PASSKEY_ORIGIN);
   cachedAuth = betterAuth({
     appName: "ItemTraxx",
@@ -631,7 +644,7 @@ export const getBetterAuth = (rawEnv: Env) => {
       },
     },
     advanced: {
-      useSecureCookies: isProductionOrigin,
+      useSecureCookies,
       ipAddress: { ipAddressHeaders: ["cf-connecting-ip"] },
       // Authentication requests always target the configured Better Auth
       // origin; a host-only cookie avoids exposing the bearer session to

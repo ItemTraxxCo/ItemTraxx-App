@@ -1,3 +1,5 @@
+import { allowsDiagnostics, readCookieConsent } from "./cookieConsentService";
+
 type ConsoleLevel = "log" | "info" | "warn" | "error";
 
 type ConsoleEntry = {
@@ -166,4 +168,3 @@ export const getClientDiagnosticsSnapshot = () => ({
   console: [...consoleEntries],
   network: [...networkEntries],
 });
-import { allowsDiagnostics, readCookieConsent } from "./cookieConsentService";

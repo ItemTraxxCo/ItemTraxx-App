@@ -1,3 +1,5 @@
+import { observeEdgeDowntimeResponse } from "../store/edgeDowntime";
+
 const DEFAULT_RETRY_DELAY_MS = 250;
 const DEFAULT_MAX_RETRIES = 1;
 
@@ -70,6 +72,7 @@ export const fetchWithTransientRetry = async (
         await waitBeforeRetry(delayMs, init.signal);
         continue;
       }
+      await observeEdgeDowntimeResponse(response);
       return response;
     } catch (error) {
       if (!shouldRetry() || retryCount >= maxRetries || !isTransientFetchError(error)) {

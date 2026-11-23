@@ -39,7 +39,7 @@ ItemTraxx helps teams manage real-world items, assets, and inventory workflows w
 - Request Demo: https://itemtraxx.com/request-demo
 - Legal and privacy: https://itemtraxx.com/legal
 - Security reporting: https://itemtraxx.com/security
-- Changelog: https://itemtraxx.com/changelog
+- Changelog: https://itemtraxx.com/index/changelog
 - Sitemap: https://itemtraxx.com/sitemap.xml
 - Robots policy: https://itemtraxx.com/robots.txt
 

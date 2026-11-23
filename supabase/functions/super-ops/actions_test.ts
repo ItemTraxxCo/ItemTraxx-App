@@ -160,7 +160,7 @@ const withMockedBetterAuthAdmin = async (run: () => Promise<void>) => {
 Deno.test("super ops dispatcher preserves a representative control-center read", async () => {
   const rowsByTable: Record<string, Record<string, unknown>> = {
     app_runtime_config: {
-      data: [{ key: "maintenance_mode", value: false }],
+      data: [{ key: "broadcast_message", value: null }],
       error: null,
     },
     super_alert_rules: { data: [], error: null },
@@ -179,7 +179,7 @@ Deno.test("super ops dispatcher preserves a representative control-center read",
   assertEquals(await response.json(), {
     ok: true,
     data: {
-      runtime_config: { maintenance_mode: false },
+      runtime_config: { broadcast_message: null },
       alert_rules: [],
       approvals: [],
       jobs: [],

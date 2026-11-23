@@ -2,8 +2,8 @@ import { execFileSync } from 'node:child_process';
 
 function getChangedFiles(base, head) {
   if (!base || /^0+$/.test(base)) return [];
-  const diffRange = head ? `${base}...${head}` : `${base}...HEAD`;
-  const output = execFileSync('git', ['diff', '--name-only', diffRange], {
+  const diffHead = head || 'HEAD';
+  const output = execFileSync('git', ['diff', '--name-only', '--no-renames', base, diffHead], {
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'inherit'],
   });
@@ -15,8 +15,8 @@ function getChangedFiles(base, head) {
 
 function getChangedEntries(base, head) {
   if (!base || /^0+$/.test(base)) return [];
-  const diffRange = head ? `${base}...${head}` : `${base}...HEAD`;
-  const output = execFileSync('git', ['diff', '--name-status', '--find-renames', diffRange], {
+  const diffHead = head || 'HEAD';
+  const output = execFileSync('git', ['diff', '--name-status', '--no-renames', base, diffHead], {
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'inherit'],
   });
@@ -43,6 +43,60 @@ function getChangedEntries(base, head) {
     });
 }
 
+function getBlobId(revision, path) {
+  try {
+    return execFileSync('git', ['rev-parse', '--verify', `${revision}:${path}`], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+  } catch {
+    return null;
+  }
+}
+
+function detectExactLegacySqlRelocations(base, head, entries) {
+  // Compare tree-entry object IDs so blobless clones can recognize exact moves
+  // without downloading file contents for Git's similarity-based rename scan.
+  const diffHead = head || 'HEAD';
+  const removed = entries.filter(
+    (entry) => entry.status === 'D' && entry.path.startsWith('supabase/sql/'),
+  );
+  const added = entries.filter(
+    (entry) =>
+      entry.status === 'A' &&
+      (entry.path.startsWith('supabase/manual/sql/') ||
+        entry.path.startsWith('supabase/archive/sql-legacy/')),
+  );
+  const matchedRemoved = new Set();
+  const matchedAdded = new Set();
+  const relocations = [];
+
+  for (const destination of added) {
+    const destinationBlob = getBlobId(diffHead, destination.path);
+    if (!destinationBlob) continue;
+
+    const source = removed.find(
+      (candidate) =>
+        !matchedRemoved.has(candidate) &&
+        getBlobId(base, candidate.path) === destinationBlob,
+    );
+    if (!source) continue;
+
+    matchedRemoved.add(source);
+    matchedAdded.add(destination);
+    relocations.push({
+      status: 'R100',
+      oldPath: source.path,
+      path: destination.path,
+    });
+  }
+
+  return [
+    ...entries.filter((entry) => !matchedRemoved.has(entry) && !matchedAdded.has(entry)),
+    ...relocations,
+  ];
+}
+
 function isLegacySqlRelocation(entry) {
   if (!entry.status.startsWith('R')) return false;
   if (!entry.oldPath?.startsWith('supabase/sql/')) return false;
@@ -55,10 +109,14 @@ function isLegacySqlRelocation(entry) {
 const base = process.env.ITX_DIFF_BASE || process.argv[2] || 'HEAD~1';
 const head = process.env.ITX_DIFF_HEAD || process.argv[3] || 'HEAD';
 const changedFiles = getChangedFiles(base, head);
-const changedEntries = getChangedEntries(base, head);
+const changedEntries = detectExactLegacySqlRelocations(
+  base,
+  head,
+  getChangedEntries(base, head),
+);
 
 if (changedFiles.length === 0) {
-  console.log(`No changed files detected for ${base}...${head}; skipping SQL/function coupling check.`);
+  console.log(`No changed files detected for ${base}..${head}; skipping SQL/function coupling check.`);
   process.exit(0);
 }
 

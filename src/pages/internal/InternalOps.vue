@@ -107,10 +107,6 @@
       <article class="card metric-card">
         <h2>Runtime</h2>
         <div class="metric-row">
-          <span>Maintenance mode</span>
-          <strong>{{ maintenanceEnabled ? "Enabled" : "Disabled" }}</strong>
-        </div>
-        <div class="metric-row">
           <span>Broadcast</span>
           <strong>{{ broadcastEnabled ? "Active" : "Inactive" }}</strong>
         </div>
@@ -120,15 +116,9 @@
     </section>
 
     <section class="card incident-controls">
-      <h2>Incident Controls</h2>
-      <p class="muted">One-click maintenance and broadcast presets with confirmation.</p>
+      <h2>Broadcast Controls</h2>
+      <p class="muted">Set the system broadcast displayed to signed-in users.</p>
       <div class="controls-row">
-        <button type="button" class="warn" @click="enableMaintenancePreset" :disabled="isSavingRuntime">
-          Start Maintenance
-        </button>
-        <button type="button" @click="disableMaintenancePreset" :disabled="isSavingRuntime">
-          End Maintenance
-        </button>
         <button type="button" @click="setBroadcastPreset('degraded')" :disabled="isSavingRuntime">
           Broadcast Degraded
         </button>
@@ -352,11 +342,6 @@ const showToast = (title: string, message: string) => {
   }, 3500);
 };
 
-const maintenanceEnabled = computed(() => {
-  const row = snapshot.value?.runtime.maintenance_mode as { enabled?: boolean } | undefined;
-  return row?.enabled === true;
-});
-
 const broadcastEnabled = computed(() => {
   const row = snapshot.value?.runtime.broadcast_message as { enabled?: boolean } | undefined;
   return row?.enabled === true;
@@ -463,32 +448,6 @@ const writeRuntimeConfig = async (key: string, value: Record<string, unknown>, s
   } finally {
     isSavingRuntime.value = false;
   }
-};
-
-const enableMaintenancePreset = async () => {
-  if (!window.confirm("Enable maintenance mode now?")) return;
-  await writeRuntimeConfig(
-    "maintenance_mode",
-    {
-      enabled: true,
-      message: "Scheduled maintenance in progress. ItemTraxx is temporarily unavailable. Check status page for details.",
-      updated_at: new Date().toISOString(),
-    },
-    "Maintenance mode enabled."
-  );
-};
-
-const disableMaintenancePreset = async () => {
-  if (!window.confirm("Disable maintenance mode?")) return;
-  await writeRuntimeConfig(
-    "maintenance_mode",
-    {
-      enabled: false,
-      message: "",
-      updated_at: new Date().toISOString(),
-    },
-    "Maintenance mode disabled."
-  );
 };
 
 const setBroadcastPreset = async (preset: "degraded" | "all_clear" | "clear") => {

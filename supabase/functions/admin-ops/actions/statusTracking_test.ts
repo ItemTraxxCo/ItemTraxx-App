@@ -102,7 +102,6 @@ const baseContext = (adminClient: SupabaseClient): AdminOpsContext => ({
     enable_status_tracking: true,
     enable_barcode_generator: true,
   },
-  maintenance: { enabled: false, message: "" },
   workspaceUpdates: [],
   jsonResponse: (status, body) =>
     new Response(JSON.stringify(body), {

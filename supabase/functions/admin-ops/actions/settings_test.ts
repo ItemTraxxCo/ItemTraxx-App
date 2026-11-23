@@ -104,7 +104,6 @@ const baseContext = (
   workspacePolicy: null,
   checkoutDueHours: 72,
   featureFlags: defaultFeatureFlags(),
-  maintenance: { enabled: false, message: "" },
   workspaceUpdates: [],
   jsonResponse: (status, body) =>
     new Response(JSON.stringify(body), {

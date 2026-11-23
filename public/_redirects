@@ -1,2 +1,3 @@
 # Avoid the root index.html alias; the prerender step supplies this collision-free HTML asset.
+/changelog /index/changelog 301
 /index /index-home 200

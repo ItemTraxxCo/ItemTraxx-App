@@ -1,4 +1,4 @@
-name: Manage Kill Switch
+name: Manage Edge Downtime
 
 permissions:
   actions: read
@@ -7,18 +7,19 @@ permissions:
 on:
   workflow_dispatch:
     inputs:
-      enabled:
-        description: "Enable or disable the kill switch."
+      mode:
+        description: "Edge downtime mode to apply (disabled clears both kill switch and maintenance)."
         required: true
         type: choice
-        default: disable
+        default: disabled
         options:
-          - enable
-          - disable
+          - disabled
+          - maintenance
+          - killswitch
       message:
-        description: "Kill-switch message shown in the app overlay and edge 503 responses."
+        description: "Optional custom message for the selected mode (blank uses the mode default)."
         required: false
-        default: "Unfortunately ItemTraxx is currently unavailable. We apologize for any inconvenience and are working to restore access as soon as possible. Please see the status page (https://status.itemtraxx.com/) for more information."
+        default: ""
 
 concurrency:
   group: manage-kill-switch
@@ -49,17 +50,16 @@ jobs:
     uses: ./.github/workflows/slack-notify-status.yml
     with:
       mode: start
-      workflow_name: Manage Kill Switch
+      workflow_name: Manage Edge Downtime
       job_name: apply
       run_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
       ref_name: ${{ github.ref_name }}
       sha: ${{ github.sha }}
+      incident_alerts_enabled: false
     secrets:
       SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
       SLACK_CHANNEL_ID: ${{ secrets.SLACK_CHANNEL_ID }}
       SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-      INCIDENT_IO_WEBHOOK_URL: ${{ secrets.INCIDENT_IO_WEBHOOK_URL }}
-      INCIDENT_IO_WEBHOOK_TOKEN: ${{ secrets.INCIDENT_IO_WEBHOOK_TOKEN }}
 
   apply:
     needs:
@@ -95,30 +95,53 @@ jobs:
       - name: Install dependencies
         run: npm ci --ignore-scripts
 
-      - name: Resolve kill-switch inputs
+      - name: Resolve downtime inputs
         id: config
         env:
-          INPUT_ENABLED: ${{ github.event.inputs.enabled }}
+          INPUT_MODE: ${{ github.event.inputs.mode }}
           INPUT_MESSAGE: ${{ github.event.inputs.message }}
         run: |
           set -euo pipefail
 
-          if [ "$INPUT_ENABLED" = "enable" ]; then
-            enabled_value="true"
-          else
-            enabled_value="false"
-          fi
+          default_killswitch_message="Unfortunately ItemTraxx is currently unavailable. We apologize for any inconvenience and are working to restore access as soon as possible. Please see the status page for more information."
+          default_maintenance_message="Maintenance is currently in progress. Please see the status page for more information."
 
-          default_message="Unfortunately ItemTraxx is currently unavailable. We apologize for any inconvenience and are working to restore access as soon as possible. Please see the status page (https://status.itemtraxx.com/) for more information."
           normalized_message="$(printf '%s' "$INPUT_MESSAGE" | tr '\n' ' ' | sed -E 's/[[:space:]]+/ /g; s/^ //; s/ $//')"
-          if [ -z "$normalized_message" ]; then
-            normalized_message="$default_message"
-          fi
+
+          killswitch_enabled="false"
+          maintenance_enabled="false"
+          killswitch_message="$default_killswitch_message"
+          maintenance_message="$default_maintenance_message"
+
+          case "$INPUT_MODE" in
+            killswitch)
+              killswitch_enabled="true"
+              if [ -n "$normalized_message" ]; then
+                killswitch_message="$normalized_message"
+              fi
+              ;;
+            maintenance)
+              maintenance_enabled="true"
+              if [ -n "$normalized_message" ]; then
+                maintenance_message="$normalized_message"
+              fi
+              ;;
+            disabled)
+              ;;
+            *)
+              echo "Unsupported edge downtime mode: $INPUT_MODE" >&2
+              exit 1
+              ;;
+          esac
 
           {
-            echo "enabled=$enabled_value"
-            echo "message<<EOF"
-            echo "$normalized_message"
+            echo "killswitch_enabled=$killswitch_enabled"
+            echo "killswitch_message<<EOF"
+            echo "$killswitch_message"
+            echo "EOF"
+            echo "maintenance_enabled=$maintenance_enabled"
+            echo "maintenance_message<<EOF"
+            echo "$maintenance_message"
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
 
@@ -126,13 +149,13 @@ jobs:
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
-          KILL_SWITCH_ENABLED: ${{ steps.config.outputs.enabled }}
-          KILL_SWITCH_MESSAGE: ${{ steps.config.outputs.message }}
+          KILLSWITCH_ENABLED: ${{ steps.config.outputs.killswitch_enabled }}
+          KILLSWITCH_MESSAGE: ${{ steps.config.outputs.killswitch_message }}
         run: |
           set -euo pipefail
           npx supabase secrets set \
-            "ITX_ITEMTRAXX_KILLSWITCH_ENABLED=$KILL_SWITCH_ENABLED" \
-            "ITX_ITEMTRAXX_KILLSWITCH_MESSAGE=$KILL_SWITCH_MESSAGE" \
+            "ITX_KILLSWITCH_ENABLED=$KILLSWITCH_ENABLED" \
+            "ITX_KILLSWITCH_MESSAGE=$KILLSWITCH_MESSAGE" \
             --project-ref "$SUPABASE_PROJECT_REF" \
             --yes
 
@@ -140,14 +163,18 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          KILL_SWITCH_ENABLED: ${{ steps.config.outputs.enabled }}
-          KILL_SWITCH_MESSAGE: ${{ steps.config.outputs.message }}
+          KILLSWITCH_ENABLED: ${{ steps.config.outputs.killswitch_enabled }}
+          KILLSWITCH_MESSAGE: ${{ steps.config.outputs.killswitch_message }}
+          MAINTENANCE_ENABLED: ${{ steps.config.outputs.maintenance_enabled }}
+          MAINTENANCE_MESSAGE: ${{ steps.config.outputs.maintenance_message }}
         run: |
           set -euo pipefail
           ./scripts/deploy-cloudflare-worker.sh \
-            --var "ITX_ITEMTRAXX_KILLSWITCH_ENABLED:$KILL_SWITCH_ENABLED" \
-            --var "ITX_ITEMTRAXX_KILLSWITCH_MESSAGE:$KILL_SWITCH_MESSAGE" \
-            --message "Manage kill switch from GitHub Actions"
+            --var "ITX_MAINTENANCE_ENABLED:$MAINTENANCE_ENABLED" \
+            --var "ITX_MAINTENANCE_MESSAGE:$MAINTENANCE_MESSAGE" \
+            --var "ITX_KILLSWITCH_ENABLED:$KILLSWITCH_ENABLED" \
+            --var "ITX_KILLSWITCH_MESSAGE:$KILLSWITCH_MESSAGE" \
+            --message "Manage edge downtime from GitHub Actions"
 
   slack-notify-finish:
     needs:
@@ -158,7 +185,7 @@ jobs:
     uses: ./.github/workflows/slack-notify-status.yml
     with:
       mode: finish
-      workflow_name: Manage Kill Switch
+      workflow_name: Manage Edge Downtime
       job_name: apply
       run_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
       ref_name: ${{ github.ref_name }}
@@ -166,30 +193,8 @@ jobs:
       status: ${{ needs.apply.result }}
       slack_channel_id: ${{ needs.slack-notify-start.outputs.slack_channel_id }}
       slack_message_ts: ${{ needs.slack-notify-start.outputs.slack_message_ts }}
+      incident_alerts_enabled: false
     secrets:
       SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
       SLACK_CHANNEL_ID: ${{ secrets.SLACK_CHANNEL_ID }}
       SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-      INCIDENT_IO_WEBHOOK_URL: ${{ secrets.INCIDENT_IO_WEBHOOK_URL }}
-      INCIDENT_IO_WEBHOOK_TOKEN: ${{ secrets.INCIDENT_IO_WEBHOOK_TOKEN }}
-
-  incidentio-notify-failure:
-    needs:
-      - require-trusted-ref
-      - kill-switch-preflight
-      - apply
-    if: ${{ always() && needs.require-trusted-ref.result == 'success' && (needs.kill-switch-preflight.outputs.active == 'false' || needs.kill-switch-preflight.outputs.active == 'unknown') && (needs.apply.result == 'failure' || needs.apply.result == 'cancelled') }}
-    uses: ./.github/workflows/incidentio-workflow-alert.yml
-    with:
-      status: ${{ needs.apply.result }}
-      severity: high
-      workflow_name: Manage Kill Switch
-      job_name: apply
-      run_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-      repository: ${{ github.repository }}
-      branch: ${{ github.ref_name }}
-      sha: ${{ github.sha }}
-      environment: production
-    secrets:
-      INCIDENT_IO_WEBHOOK_URL: ${{ secrets.INCIDENT_IO_WEBHOOK_URL }}
-      INCIDENT_IO_WEBHOOK_TOKEN: ${{ secrets.INCIDENT_IO_WEBHOOK_TOKEN }}

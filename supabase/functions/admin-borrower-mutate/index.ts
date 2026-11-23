@@ -373,23 +373,6 @@ const createGeneratedBorrowerRecord = async (
   };
 };
 
-const isLocalhostMaintenanceBypassRequest = (req: Request) => {
-  if ((Deno.env.get("ITX_ALLOW_LOCALHOST_MAINTENANCE_BYPASS") ?? "").toLowerCase() !== "true") {
-    return false;
-  }
-  const origin = req.headers.get("origin");
-  if (!origin) return false;
-  try {
-    const hostname = new URL(origin).hostname.toLowerCase();
-    if (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "0.0.0.0") {
-      return true;
-    }
-    return false;
-  } catch {
-    return false;
-  }
-};
-
 serve(async (req) => {
   const { hasOrigin, originAllowed, headers } = resolveCorsHeaders(req, baseCorsHeaders);
 
@@ -564,24 +547,6 @@ serve(async (req) => {
         return jsonResponse(401, { error: "Session revoked" });
       }
 
-    }
-
-    const { data: maintenanceRow } = await adminClient
-      .from("app_runtime_config")
-      .select("value")
-      .eq("key", "maintenance_mode")
-      .maybeSingle();
-    const maintenanceValue =
-      maintenanceRow?.value && typeof maintenanceRow.value === "object"
-        ? (maintenanceRow.value as Record<string, unknown>)
-        : {};
-    if (maintenanceValue.enabled === true && !isLocalhostMaintenanceBypassRequest(req)) {
-      return jsonResponse(503, {
-        error:
-          typeof maintenanceValue.message === "string" && maintenanceValue.message.trim()
-            ? maintenanceValue.message.trim()
-            : "Maintenance mode enabled.",
-      });
     }
 
     if (action === "list_deleted") {

@@ -72,7 +72,7 @@ const claimSharedTrustedIngressRequest = async (
         method: "POST",
         headers: {
           apikey: serviceKey,
-          authorization: `Bearer ${serviceKey}`,
+          ...(serviceKey.startsWith("sb_secret_") ? {} : { authorization: `Bearer ${serviceKey}` }),
           "content-type": "application/json",
         },
         body: JSON.stringify({

@@ -20,6 +20,14 @@
       <h2>Create Borrower</h2>
       <form class="form" @submit.prevent="handleCreate">
         <label>Workspace<select v-model="formWorkspaceId"><option value="">Select workspace</option><option v-for="t in workspaces" :key="t.id" :value="t.id">{{ t.name }}</option></select></label>
+        <template v-if="encryptedMode">
+          <fieldset><legend>Name format</legend><label><input v-model="nameMode" type="radio" value="split" /> First &amp; Last Name</label><label><input v-model="nameMode" type="radio" value="free" /> Free Input</label></fieldset>
+          <label>{{ nameMode === 'split' ? 'First Name' : 'Name / Identifier' }}<input v-model="firstName" type="text" maxlength="100" required /></label>
+          <label v-if="nameMode === 'split'">Last Name<input v-model="lastName" type="text" maxlength="100" /></label>
+          <label>Borrower ID<input v-model="borrowerId" type="text" maxlength="32" pattern="[A-Za-z0-9]+" required /></label>
+          <label>Email<input v-model="email" type="email" maxlength="254" /></label>
+        </template>
+        <template v-else>
         <label>
           Username
           <input v-model="previewUsername" type="text" readonly title="If you need to change this, contact support." />
@@ -28,8 +36,9 @@
           Borrower ID
           <input v-model="previewBorrowerId" type="text" readonly title="If you need to change this, contact support." />
         </label>
+        </template>
         <div class="panel-actions">
-          <button type="button" class="sa-btn" @click="regenerateIdentity">Regenerate</button>
+          <button v-if="!encryptedMode" type="button" class="sa-btn" @click="regenerateIdentity">Regenerate</button>
           <button type="submit" class="sa-btn primary" :disabled="isSaving">Create</button>
         </div>
       </form>
@@ -114,6 +123,12 @@ const isLoading = ref(false);
 const isSaving = ref(false);
 const error = ref("");
 const formWorkspaceId = ref("");
+const encryptedMode = import.meta.env.DEV && import.meta.env.VITE_ENCRYPTED_BORROWERS_LOCAL === "true";
+const nameMode = ref<"split" | "free">("split");
+const firstName = ref("");
+const lastName = ref("");
+const borrowerId = ref("");
+const email = ref("");
 const previewUsername = ref("");
 const previewBorrowerId = ref("");
 const editItem = ref<SuperBorrowerItem | null>(null);
@@ -205,17 +220,20 @@ const handleCreate = async () => {
     showToast("Invalid input", "Tenant is required.");
     return;
   }
+  if (encryptedMode && (!firstName.value.trim() || !/^[a-z0-9]{1,32}$/i.test(borrowerId.value.trim()))) {
+    showToast("Invalid input", "Name and alphanumeric borrower ID are required.");
+    return;
+  }
   isSaving.value = true;
   try {
     const created = await createSuperBorrower({
       workspace_id: formWorkspaceId.value,
-      username: previewUsername.value,
-      borrower_id: previewBorrowerId.value,
+      ...(encryptedMode ? { first_name: firstName.value.trim(), last_name: nameMode.value === "split" ? lastName.value.trim() || null : null, borrower_id: borrowerId.value.trim(), email: email.value.trim() || null } : { username: previewUsername.value, borrower_id: previewBorrowerId.value }),
     });
     borrowers.value = [created, ...borrowers.value];
     previewUsername.value = created.username;
     previewBorrowerId.value = created.borrower_id;
-    regenerateIdentity();
+    if (encryptedMode) { firstName.value = ""; lastName.value = ""; borrowerId.value = ""; email.value = ""; } else regenerateIdentity();
     showToast("Created", "Borrower created.");
   } catch (err) {
     showToast("Create failed", toUserFacingErrorMessage(err, "Unable to create borrower."));
@@ -267,7 +285,7 @@ const confirmDelete = async (payload: { superPassword: string; confirmPhrase: st
 };
 
 onMounted(() => {
-  regenerateIdentity();
+  if (!encryptedMode) regenerateIdentity();
   void (async () => {
     await loadTenants();
     await loadBorrowers();

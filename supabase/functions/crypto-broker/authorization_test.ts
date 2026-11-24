@@ -5,10 +5,11 @@ const workspace = 'd8b57c2b-c473-451e-9d0b-a0989ac8a8a4';
 const otherWorkspace = 'fe2c2477-e6aa-462b-ab3c-502ba53bcba3';
 const id = 'e535bd49-df6a-4c94-8e77-f9497ab83e43';
 
-function setup(options: { role?: string; valid?: boolean; missing?: boolean; rowWorkspace?: string; gatewayFailure?: boolean; nameOnly?: boolean; realGateway?: (op: string, body: Record<string, unknown>) => Promise<Record<string, unknown>> } = {}) {
+function setup(options: { role?: string; valid?: boolean; missing?: boolean; rowWorkspace?: string; gatewayFailure?: boolean; nameOnly?: boolean; borrowerAccessMode?: string; borrowerDeleted?: boolean; realGateway?: (op: string, body: Record<string, unknown>) => Promise<Record<string, unknown>> } = {}) {
   let gatewayCalls = 0;
   let createArgs: Record<string, unknown> | undefined;
   let restoreCalls = 0;
+  const borrowerReaders: string[] = [];
   const query = (table: string) => {
     const filters: Record<string, unknown> = {};
     return {
@@ -16,7 +17,7 @@ function setup(options: { role?: string; valid?: boolean; missing?: boolean; row
       eq(column: string, value: unknown) { filters[column] = value; return this; },
       is() { return this; },
       not() { return this; },
-      maybeSingle() { const matching = filters.workspace_id === (options.rowWorkspace ?? workspace); return Promise.resolve({ data: matching ? { id, access_mode: 'all', encrypted_data: 'cipher', nonce: 'nonce', auth_tag: 'tag', key_version: 1 } : null, error: null }); },
+      maybeSingle() { const matching = filters.workspace_id === (options.rowWorkspace ?? workspace) && (!filters.access_mode || filters.access_mode === (options.borrowerAccessMode ?? 'all')); return Promise.resolve({ data: matching ? { id, access_mode: options.borrowerAccessMode ?? 'all', encrypted_data: 'cipher', nonce: 'nonce', auth_tag: 'tag', key_version: 1 } : null, error: null }); },
       single() {
         if (table === 'profiles') return Promise.resolve({ data: { workspace_id: workspace, role: options.role ?? 'workspace_admin', is_active: true }, error: null });
         return Promise.resolve({ data: { status: 'active' }, error: null });
@@ -24,14 +25,16 @@ function setup(options: { role?: string; valid?: boolean; missing?: boolean; row
       order() { return this; },
       range() { return this.in(); },
       in() {
-        const matching = filters.workspace_id === (options.rowWorkspace ?? workspace);
-        return Promise.resolve({ data: matching ? [{ id, encrypted_data: 'cipher', nonce: 'nonce', auth_tag: 'tag', key_version: 1 }] : [], error: null });
+        const matching = filters.workspace_id === (options.rowWorkspace ?? workspace) && (!filters.access_mode || filters.access_mode === (options.borrowerAccessMode ?? 'all'));
+        if (table === 'item_logs') return Promise.resolve({ data: matching ? [{ id, checked_out_by: id }] : [], error: null });
+        return Promise.resolve({ data: matching ? [{ id, access_mode: options.borrowerAccessMode ?? 'all', deleted_at: options.borrowerDeleted ? '2026-01-01' : null, encrypted_data: 'cipher', nonce: 'nonce', auth_tag: 'tag', key_version: 1 }] : [], error: null });
       },
     };
   };
-  const client = { from: query, rpc: (name: string, args: Record<string, unknown>) => { if (name === 'restore_encrypted_borrower') { restoreCalls++; return Promise.resolve({ data: true, error: null }); } if (name === 'create_encrypted_borrower') { createArgs = args; return Promise.resolve({ data: args.p_id, error: null }); } return Promise.resolve({ data: [{ allowed: true, retry_after_seconds: null }], error: null }); } };
+  let clientCount = 0;
+  const client = (kind: string) => ({ from: (table: string) => { if (table === 'borrowers') borrowerReaders.push(kind); return query(table); }, rpc: (name: string, args: Record<string, unknown>) => { if (name === 'restore_encrypted_borrower') { restoreCalls++; return Promise.resolve({ data: true, error: null }); } if (name === 'create_encrypted_borrower') { createArgs = args; return Promise.resolve({ data: args.p_id, error: null }); } return Promise.resolve({ data: [{ allowed: true, retry_after_seconds: null }], error: null }); } });
   const handler = createBrokerHandler({
-    createClient: () => client as never,
+    createClient: () => client(++clientCount % 2 ? 'user' : 'admin') as never,
     getExternalAuthUser: async () => ({ data: { user: { id } }, error: null }) as never,
     validateAccountDeviceSession: async () => ({ valid: options.valid ?? true, relationMissing: options.missing ?? false }) as never,
     requireTrustedEdgeIngress: async () => null,
@@ -47,8 +50,60 @@ function setup(options: { role?: string; valid?: boolean; missing?: boolean; row
     },
   } as never);
   const run = (body: Record<string, unknown> = { action: 'decrypt', ids: [id] }) => handler(new Request('https://example.com/functions/crypto-broker', { method: 'POST', headers: { authorization: 'Bearer test', 'content-type': 'application/json' }, body: JSON.stringify({ ...body, device_id: 'device', workspace_id: otherWorkspace }) }));
-  return { run, getGatewayCalls: () => gatewayCalls, getCreateArgs: () => createArgs, getRestoreCalls: () => restoreCalls };
+  return { run, getGatewayCalls: () => gatewayCalls, getCreateArgs: () => createArgs, getRestoreCalls: () => restoreCalls, getBorrowerReaders: () => borrowerReaders };
 }
+
+Deno.test('tenant directory reads through RLS and excludes private email', async () => {
+  const t = setup({ role: 'tenant_account', nameOnly: true });
+  const response = await t.run({ action: 'list', page: 0, page_size: 20 });
+  assertEquals(response.status, 200);
+  assertEquals(t.getBorrowerReaders(), ['user']);
+  const result = await response.json();
+  assertEquals(result.data.rows[0].username, 'Ada Lovelace');
+  assertEquals('email' in result.data.rows[0], false);
+});
+Deno.test('tenant cannot use archived or privileged broker actions', async () => {
+  for (const body of [{ action: 'list', archived: true, page: 0, page_size: 20 }, { action: 'decrypt', ids: [id] }, { action: 'hash-index', values: { borrower_id: '123' } }, { action: 'restore', id }]) {
+    const t = setup({ role: 'tenant_account' });
+    assertEquals((await t.run(body)).status, 403);
+    assertEquals(t.getGatewayCalls(), 0);
+  }
+});
+Deno.test('log names require visible workspace logs before decryption', async () => {
+  const ok = setup({ nameOnly: true });
+  const response = await ok.run({ action: 'decrypt-log-borrowers', ids: [id] });
+  assertEquals(response.status, 200);
+  assertEquals((await response.json()).data[0], { id, borrower: { username: 'Ada Lovelace', borrower_id: '123' } });
+  const denied = setup({ rowWorkspace: otherWorkspace });
+  assertEquals((await denied.run({ action: 'decrypt-log-borrowers', ids: [id] })).status, 404);
+  assertEquals(denied.getGatewayCalls(), 0);
+  const tenant = setup({ role: 'tenant_account' });
+  assertEquals((await tenant.run({ action: 'decrypt-log-borrowers', ids: [id] })).status, 403);
+});
+Deno.test('individual accounts cannot decrypt restricted or archived borrower history', async () => {
+  for (const options of [{ borrowerAccessMode: 'restricted' }, { borrowerDeleted: true }]) {
+    const t = setup({ role: 'individual_account', ...options });
+    assertEquals((await t.run({ action: 'decrypt-log-borrowers', ids: [id] })).status, 404);
+    assertEquals(t.getGatewayCalls(), 0);
+  }
+});
+Deno.test('individual account active reads use RLS and archived reads exclude restricted borrowers', async () => {
+  const active = setup({ role: 'individual_account' });
+  assertEquals((await active.run({ action: 'list', page: 0, page_size: 20 })).status, 200);
+  assertEquals(active.getBorrowerReaders(), ['user']);
+  const decrypt = setup({ role: 'individual_account' });
+  assertEquals((await decrypt.run()).status, 200);
+  assertEquals(decrypt.getBorrowerReaders(), ['user']);
+  const archived = setup({ role: 'individual_account', borrowerAccessMode: 'restricted' });
+  const response = await archived.run({ action: 'list', archived: true, page: 0, page_size: 20 });
+  assertEquals(response.status, 200);
+  assertEquals((await response.json()).data.rows, []);
+  assertEquals(archived.getGatewayCalls(), 0);
+  const restore = setup({ role: 'individual_account', borrowerAccessMode: 'restricted' });
+  assertEquals((await restore.run({ action: 'restore', id })).status, 404);
+  assertEquals(restore.getGatewayCalls(), 0);
+  assertEquals(restore.getRestoreCalls(), 0);
+});
 
 Deno.test('broker authorizes an active admin and uses the profile workspace', async () => {
   const t = setup(); const response = await t.run();

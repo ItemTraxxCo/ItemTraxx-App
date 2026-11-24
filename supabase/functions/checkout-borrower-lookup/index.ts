@@ -156,6 +156,9 @@ serve((req) => withRequestSpan(req, "POST /functions/checkout-borrower-lookup", 
     }
     const borrower = borrowerResult as unknown as { id: string; access_mode: string; encrypted_data: string | null; nonce: string | null; auth_tag: string | null; key_version: number | null } | null;
     if (!borrower) return jsonResponse(404, { error: "Borrower not found" });
+    if (encryptedMode && profile.role === "individual_account" && borrower.access_mode !== "all") {
+      return jsonResponse(404, { error: "Borrower not found" });
+    }
     if (profile.role === "tenant_account" && borrower.access_mode === "restricted") {
       const { data: grant } = await adminClient.from("borrower_access_grants").select("borrower_id").eq("borrower_id", borrower.id).eq("profile_id", authData.user.id).maybeSingle();
       // Deliberately the same 404 as an unknown borrower: a caller without a grant must

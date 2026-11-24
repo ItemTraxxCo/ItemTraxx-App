@@ -37,7 +37,7 @@ try {
   const lateResult = await late;
   assert.notEqual(lateResult.code, 0); assert.match(lateResult.stderr, /Borrower writes temporarily paused/);
   for (const isolation of ['repeatable read', 'serializable']) {
-    const result = sql(`begin isolation level ${isolation}; select public.backfill_encrypted_borrower('${workspace}','${borrower}','before','ID','cipher','nonce','tag',repeat('a',64),null); rollback;`);
+    const result = sql(`begin isolation level ${isolation}; select public.backfill_encrypted_borrower_v2('${workspace}','${borrower}','before','ID','cipher','nonce','tag',repeat('a',64),null,public.borrower_write_freeze_epoch('${workspace}')); rollback;`);
     assert.match(result, /t/);
   }
   sql(`select public.set_borrower_write_freeze('${workspace}',false);`);
@@ -59,7 +59,7 @@ try {
     snapshot.stdin.write(`\\set VERBOSITY verbose\nbegin isolation level ${isolation}; select public.borrower_write_freeze_is_active('${workspace}');\n`);
     await pause();
     sql(`select public.set_borrower_write_freeze('${workspace}',false);`);
-    snapshot.stdin.end(`select public.backfill_encrypted_borrower('${workspace}','${borrower}','before','ID','cipher','nonce','tag',repeat('a',64),null); commit;`);
+    snapshot.stdin.end(`select public.backfill_encrypted_borrower_v2('${workspace}','${borrower}','before','ID','cipher','nonce','tag',repeat('a',64),null,public.borrower_write_freeze_epoch('${workspace}')); commit;`);
     const code = await new Promise((resolve) => snapshot.on('close', resolve));
     assert.notEqual(code, 0); assert.match(stderr, /40001/);
   }

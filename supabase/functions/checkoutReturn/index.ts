@@ -255,6 +255,10 @@ serve((req) => withRequestSpan(req, "POST /functions/checkoutReturn", async (spa
         return jsonResponse(404, { error: "Borrower not found." });
       }
 
+      if (encryptedMode && callerRole === "individual_account" && borrowerData.access_mode !== "all") {
+        return jsonResponse(404, { error: "Borrower not found." });
+      }
+
       if (callerRole === "tenant_account" && borrowerData.access_mode === "restricted") {
         const { data: grant, error: grantError } = await adminClient
           .from("borrower_access_grants")

@@ -1,9 +1,11 @@
 import type { SuperOpsContext } from "../context.ts";
+import { decryptSuperBorrowers } from "../../_shared/superEncryptedBorrowers.ts";
 
 export const INTERNAL_OPS_ACTIONS = ["get_internal_ops_snapshot"] as const;
 
 export const handleInternalOpsAction = async (
   context: SuperOpsContext,
+  decryptBorrowers: typeof decryptSuperBorrowers = decryptSuperBorrowers,
 ): Promise<Response | null> => {
   const { action, adminClient, jsonResponse } = context;
 
@@ -13,6 +15,7 @@ export const handleInternalOpsAction = async (
     const since24hIso = new Date(Date.now() - 24 * 60 * 60 * 1000)
       .toISOString();
 
+    const encryptedMode = Deno.env.get("ITX_ENCRYPTED_BORROWERS_LOCAL") === "true";
     const [
       recentLogsResult,
       queueRowsResult,
@@ -186,7 +189,7 @@ export const handleInternalOpsAction = async (
         )
         : Promise.resolve({ data: [], error: null }),
       borrowerIds.length
-        ? adminClient.from("borrowers").select("id, username, borrower_id").in(
+        ? adminClient.from("borrowers").select(encryptedMode ? "id,workspace_id,encrypted_data,nonce,auth_tag,key_version" : "id,workspace_id,username,borrower_id").in(
           "id",
           borrowerIds,
         )
@@ -212,12 +215,18 @@ export const handleInternalOpsAction = async (
         },
       ]),
     );
+    if (borrowerRowsResult.error) return jsonResponse(503, { error: "Borrower data unavailable." });
+    const sourceBorrowers = borrowerRowsResult.data ?? [];
+    const borrowers = encryptedMode
+      ? await decryptBorrowers(sourceBorrowers as unknown as Parameters<typeof decryptSuperBorrowers>[0], Deno.env.get("ITX_SGW_INTERNAL_SECRET") ?? "")
+      : sourceBorrowers as Array<{ id: string; workspace_id: string; username: string | null; borrower_id: string | null }>;
     const borrowerMap = new Map(
-      (borrowerRowsResult.data ?? []).map((borrower) => [
+      borrowers.map((borrower) => [
         borrower.id as string,
         {
           username: borrower.username as string | null,
           borrower_id: borrower.borrower_id as string | null,
+          workspace_id: borrower.workspace_id,
         },
       ]),
     );
@@ -229,9 +238,10 @@ export const handleInternalOpsAction = async (
 
     const recentEvents = recentLogs.slice(0, 40).map((row) => {
       const item = row.item_id ? itemMap.get(row.item_id) : null;
-      const borrower = row.checked_out_by
+      const matchedBorrower = row.checked_out_by
         ? borrowerMap.get(row.checked_out_by)
         : null;
+      const borrower = matchedBorrower?.workspace_id === row.workspace_id ? matchedBorrower : null;
       return {
         workspace_id: row.workspace_id,
         workspace_name: row.workspace_id

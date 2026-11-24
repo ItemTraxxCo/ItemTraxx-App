@@ -3,6 +3,7 @@ import { authenticatedSelect, authenticatedSelectPage } from "./authenticatedDat
 import { getAuthState } from "../store/authState";
 import { edgeFunctionError, missingContextError } from "./appErrors";
 import { getOrCreateDeviceSession } from "../utils/deviceSession";
+import { isEncryptedBorrowerDirectoryEnabled } from "./borrowerService";
 
 export type ItemRecord = {
   id: string;
@@ -217,6 +218,7 @@ export const restoreItem = async (id: string) => {
 
 export const fetchItemLogs = async () => {
   const workspaceId = getWorkspaceContextId();
+  const encryptedMode = isEncryptedBorrowerDirectoryEnabled();
   const rows = ((await authenticatedSelect<Array<{
     id: string;
     workspace_id: string;
@@ -231,8 +233,9 @@ export const fetchItemLogs = async () => {
       borrower_id: string;
     }>;
   }>>("item_logs", {
-    select:
-      "id,workspace_id,item_id,checked_out_by,action_type,action_time,performed_by,item:item_id(name,barcode),borrower:checked_out_by(username,borrower_id)",
+    select: encryptedMode
+      ? "id,workspace_id,item_id,checked_out_by,action_type,action_time,performed_by,item:item_id(name,barcode)"
+      : "id,workspace_id,item_id,checked_out_by,action_type,action_time,performed_by,item:item_id(name,barcode),borrower:checked_out_by(username,borrower_id)",
     workspace_id: `eq.${workspaceId}`,
     order: "action_time.desc",
     limit: "200",
@@ -260,6 +263,23 @@ export const fetchItemLogs = async () => {
     })) ?? []
     : [];
   const performersById = new Map(performers.map((performer) => [performer.id, performer]));
+  const decrypted = new Map<string, { username: string; borrower_id: string }>();
+  if (encryptedMode) {
+    const logIds = rows.filter((row) => row.checked_out_by).map((row) => row.id);
+    const { deviceId } = getOrCreateDeviceSession();
+    for (let offset = 0; offset < logIds.length; offset += 100) {
+      const ids = logIds.slice(offset, offset + 100);
+      const response = await invokeEdgeFunction<{ data: Array<{ id: string; borrower: { username: string; borrower_id: string } | null }> }>('crypto-broker', {
+        method: 'POST', body: { action: 'decrypt-log-borrowers', ids, device_id: deviceId },
+      });
+      if (!response.ok || !Array.isArray(response.data?.data) || response.data.data.length !== ids.length) throw edgeFunctionError(response, 'Unable to load encrypted history.');
+      const expected = new Set(ids);
+      for (const entry of response.data.data) {
+        if (!expected.has(entry.id) || decrypted.has(entry.id) || !entry.borrower || typeof entry.borrower.username !== 'string' || typeof entry.borrower.borrower_id !== 'string') throw new Error('Unable to load encrypted history.');
+        decrypted.set(entry.id, entry.borrower);
+      }
+    }
+  }
 
   return rows.map((row) => ({
     id: row.id,
@@ -271,6 +291,6 @@ export const fetchItemLogs = async () => {
     performed_by: row.performed_by,
     tenant_account: row.performed_by ? performersById.get(row.performed_by) ?? null : null,
     item: pickRelation(row.item),
-    borrower: pickRelation(row.borrower),
+    borrower: encryptedMode ? decrypted.get(row.id) ?? null : pickRelation(row.borrower),
   }));
 };

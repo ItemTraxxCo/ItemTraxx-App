@@ -477,6 +477,7 @@ serve(async (req) => {
         .eq("workspace_id", profile.workspace_id).is("deleted_at", null)
         .maybeSingle();
       if (!borrower) return false;
+      if (encryptedMode && profile.role === "individual_account" && borrower.access_mode !== "all") return false;
       if (
         profile.role === "workspace_admin" || profile.role === "individual_account" || borrower.access_mode === "all"
       ) return true;

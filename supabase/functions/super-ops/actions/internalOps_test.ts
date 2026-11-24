@@ -215,7 +215,7 @@ Deno.test("get_internal_ops_snapshot returns a full snapshot with traffic, queue
   const workspaceRows = [{ id: workspaceId, name: "Lincoln Elementary" }];
   const itemRows = [{ id: itemId, name: "Chromebook 12", barcode: "CB-0012" }];
   const borrowerRows = [
-    { id: borrowerId, username: "jdoe", borrower_id: "1234AB" },
+    { id: borrowerId, workspace_id: workspaceId, username: "jdoe", borrower_id: "1234AB" },
   ];
   const allWorkspaces = [
     { id: workspaceId, name: "Lincoln Elementary", status: "active" },
@@ -283,6 +283,32 @@ Deno.test("get_internal_ops_snapshot returns a full snapshot with traffic, queue
     data.recent_events[0].workspace_name === "Lincoln Elementary",
     "workspace resolved",
   );
+});
+
+Deno.test('internal traffic never attaches a borrower from a different workspace', async () => {
+  const adminClient = buildAdminClient({
+    item_logs: { data: [{ workspace_id: 'workspace-a', item_id: 'item-a', checked_out_by: 'borrower-b', action_type: 'checkout', action_time: new Date().toISOString() }], error: null },
+    borrowers: { data: [{ id: 'borrower-b', workspace_id: 'workspace-b', username: 'Private', borrower_id: 'ID' }], error: null },
+  });
+  const response = await handleInternalOpsAction(contextFor('get_internal_ops_snapshot', {}, adminClient));
+  const body = await response!.json();
+  assert(body.data.recent_events[0].borrower_username === null, 'cross-workspace borrower was attached');
+});
+Deno.test('encrypted internal traffic decrypts ciphertext without plaintext fallback', async () => {
+  Deno.env.set('ITX_ENCRYPTED_BORROWERS_LOCAL', 'true');
+  try {
+    const adminClient = buildAdminClient({
+      item_logs: { data: [{ workspace_id: 'workspace-a', item_id: 'item-a', checked_out_by: 'borrower-a', action_type: 'checkout', action_time: new Date().toISOString() }], error: null },
+      borrowers: { data: [{ id: 'borrower-a', workspace_id: 'workspace-a', encrypted_data: 'cipher', nonce: 'nonce', auth_tag: 'tag', key_version: 1 }], error: null },
+    });
+    const decrypt = async (rows: Array<{ id: string; workspace_id: string }>) => rows.map(row => ({ ...row, username: 'Decoded', borrower_id: 'ID' }));
+    const response = await handleInternalOpsAction(contextFor('get_internal_ops_snapshot', {}, adminClient), decrypt as never);
+    const body = await response!.json();
+    assert(body.data.recent_events[0].borrower_username === 'Decoded', 'decrypted borrower missing');
+    let rejected = false;
+    try { await handleInternalOpsAction(contextFor('get_internal_ops_snapshot', {}, adminClient), (async () => { throw new Error('unavailable'); }) as never); } catch { rejected = true; }
+    assert(rejected, 'gateway failure must not fall back to plaintext');
+  } finally { Deno.env.delete('ITX_ENCRYPTED_BORROWERS_LOCAL'); }
 });
 
 Deno.test("get_internal_ops_snapshot falls back to Unknown workspace and nulls for unmapped events", async () => {

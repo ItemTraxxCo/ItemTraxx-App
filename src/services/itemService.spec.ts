@@ -300,6 +300,19 @@ describe("deleteItem / restoreItem", () => {
 });
 
 describe("fetchItemLogs", () => {
+  it('loads encrypted history names from the broker and fails closed on errors', async () => {
+    vi.stubEnv('VITE_ENCRYPTED_BORROWERS_LOCAL', 'true');
+    try {
+      mockedSelect.mockResolvedValue([{ id: 'log-1', workspace_id: WORKSPACE_ID, item_id: 'item-1', checked_out_by: 'b-1', action_type: 'checkout', action_time: '2026-01-01', performed_by: null, item: null }] as never);
+      mockedInvoke.mockResolvedValueOnce({ ok: true, data: { data: [{ id: 'log-1', borrower: { username: 'Ada', borrower_id: 'ID1' } }] } } as never);
+      const rows = await fetchItemLogs();
+      expect(rows[0].borrower).toEqual({ username: 'Ada', borrower_id: 'ID1' });
+      expect(mockedSelect.mock.calls[0][1].select).not.toContain('borrower:');
+      expect(mockedInvoke).toHaveBeenCalledWith('crypto-broker', { method: 'POST', body: { action: 'decrypt-log-borrowers', ids: ['log-1'], device_id: 'device-1' } });
+      mockedInvoke.mockResolvedValueOnce({ ok: false, status: 503, error: 'unavailable' } as never);
+      await expect(fetchItemLogs()).rejects.toThrow();
+    } finally { vi.unstubAllEnvs(); }
+  });
   it("throws a missing-context error without a workspace", async () => {
     setWorkspaceContext(null);
     await expect(fetchItemLogs()).rejects.toThrow(/missing workspace context/i);

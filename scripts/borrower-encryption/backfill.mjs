@@ -1,9 +1,36 @@
 // This engine never deletes legacy columns or falls back when encryption fails.
 export async function backfillWorkspace({ workspaceId, store, gateway, delayMs = 250, sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)) }) {
   if (!workspaceId || !Number.isFinite(delayMs) || delayMs < 1) throw new Error('Invalid backfill configuration');
+  let freezeEpoch;
+  const requireSameFreeze = async () => {
+    const current = await store.requireFreeze(workspaceId);
+    if (typeof current !== 'string' || !current) throw new Error('Workspace writer freeze required');
+    if (freezeEpoch !== undefined && freezeEpoch !== current) throw new Error('Workspace writer freeze changed');
+    freezeEpoch = current;
+  };
+  // Check every legacy identifier before writing anything. Retain only hashes,
+  // bound memory, and use the SGW's actual normalization and workspace pepper.
+  const indexes = new Set();
+  let preflightCursor = '';
+  for (;;) {
+    await requireSameFreeze();
+    const rows = await store.listPreflightPage(workspaceId, preflightCursor, 50);
+    if (!Array.isArray(rows) || rows.length > 50) throw new Error('Invalid preflight page');
+    if (!rows.length) break;
+    for (const row of rows) {
+      if (row.workspace_id !== workspaceId || !row.id || (preflightCursor && row.id <= preflightCursor) || typeof row.borrower_id !== 'string' || !row.borrower_id.trim()) throw new Error('Invalid preflight row');
+      const hash = await gateway.hash(workspaceId, row.borrower_id);
+      if (typeof hash !== 'string' || !/^[a-f0-9]{64}$/.test(hash)) throw new Error('Invalid blind index');
+      if (indexes.has(hash)) throw new Error('Borrower index collision');
+      indexes.add(hash);
+      if (indexes.size > 100000) throw new Error('Backfill preflight limit exceeded');
+      preflightCursor = row.id;
+      await sleep(delayMs);
+    }
+  }
   let migrated = 0;
   while (true) {
-    await store.requireFreeze(workspaceId);
+    await requireSameFreeze();
     const rows = await store.list(workspaceId, 50);
     if (!Array.isArray(rows) || rows.length > 50) throw new Error('Invalid backfill page');
     if (rows.length === 0) break;
@@ -17,7 +44,7 @@ export async function backfillWorkspace({ workspaceId, store, gateway, delayMs =
       const matches = await store.findHash(workspaceId, encrypted.borrower_id_hash);
       if (!Array.isArray(matches) || matches.some((otherId) => otherId !== row.id)) throw new Error('Borrower index collision');
       const update = { encrypted_data: encrypted.ciphertext, nonce: encrypted.nonce, auth_tag: encrypted.auth_tag, key_version: 1, borrower_id_hash: encrypted.borrower_id_hash };
-      if (!await store.save(row, update)) throw new Error('Borrower changed during backfill');
+      if (!await store.save(row, update, freezeEpoch)) throw new Error('Borrower changed during backfill');
       const stored = await store.read(workspaceId, row.id);
       if (!stored || Object.entries(update).some(([key, value]) => stored[key] !== value)) throw new Error('Stored ciphertext verification failed');
       const check = await gateway.decrypt(workspaceId, row.id, { ciphertext: stored.encrypted_data, nonce: stored.nonce, auth_tag: stored.auth_tag });
@@ -28,7 +55,7 @@ export async function backfillWorkspace({ workspaceId, store, gateway, delayMs =
   }
   let cursor = '';
   for (;;) {
-    await store.requireFreeze(workspaceId);
+    await requireSameFreeze();
     const rows = await store.listVerifiedPage(workspaceId, cursor, 50);
     if (!Array.isArray(rows) || rows.length > 50) throw new Error('Invalid verification page');
     if (!rows.length) break;
@@ -44,6 +71,6 @@ export async function backfillWorkspace({ workspaceId, store, gateway, delayMs =
       await sleep(delayMs);
     }
   }
-  await store.requireFreeze(workspaceId);
+  await requireSameFreeze();
   return { migrated };
 }

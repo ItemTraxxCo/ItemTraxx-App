@@ -7,9 +7,46 @@ const workspace = 'd8b57c2b-c473-451e-9d0b-a0989ac8a8a4';
 const id = 'e535bd49-df6a-4c94-8e77-f9497ab83e43';
 const key = crypto.getRandomValues(new Uint8Array(32));
 const store = new Map();
-const env = { MASTER_KEK: btoa(String.fromCharCode(...key)), KMS_INTERNAL_SECRET: 'a'.repeat(64), KMS_LIFECYCLE_SECRET: 'b'.repeat(64), KEYS: { get: async (k) => store.get(k) ?? null } };
+const env = { MASTER_KEK: btoa(String.fromCharCode(...key)), KMS_INTERNAL_SECRET: 'a'.repeat(64), KMS_LIFECYCLE_SECRET: 'b'.repeat(64), SGW_PROVISIONING_ENABLED: 'true', KEYS: { get: async (k) => store.get(k) ?? null } };
 const request = (path, body, secret = env.KMS_INTERNAL_SECRET) => new Request(`https://sgw.itemtraxx.com${path}`, { method: 'POST', headers: { authorization: `Bearer ${secret}`, 'content-type': 'application/json' }, body: JSON.stringify(body) });
 const call = (path, body, secret) => handleRequest(request(path, body, secret), env, async () => true);
+
+test('provisioning is disabled by default and does not touch the coordinator or KV', async () => {
+  let touched = false;
+  const custom = { ...env, SGW_PROVISIONING_ENABLED: undefined, KEYS: { get: async () => { touched = true; return null; } } };
+  const response = await handleRequest(request('/v1/kms/generate-tenant-keys', { workspace_id: workspace }, env.KMS_LIFECYCLE_SECRET), custom, async () => { touched = true; return true; });
+  assert.equal(response.status, 503);
+  assert.equal(touched, false);
+});
+
+test('closing the provisioning gate does not prevent revocation', async () => {
+  let state = 'active';
+  const coordinator = async (action) => {
+    if (action === 'claim_revoke' && state === 'active') { state = 'revoking'; return true; }
+    if (action === 'finish_revoke' && state === 'revoking') { state = 'revoked'; return true; }
+    return false;
+  };
+  const custom = { ...env, SGW_PROVISIONING_ENABLED: 'false', KEYS: { delete: async () => {} } };
+  const response = await handleRequest(request('/v1/kms/revoke-tenant-keys', { workspace_id: workspace }, env.KMS_LIFECYCLE_SECRET), custom, coordinator);
+  assert.equal(response.status, 200);
+  assert.equal(state, 'revoked');
+});
+
+test('restore hold blocks key provisioning and all crypto before touching database or KV', async () => {
+  let touched = false;
+  const custom = { ...env, SGW_RESTORE_HOLD: 'true', KEYS: { get: async () => { touched = true; return null; } } };
+  for (const [path, body, secret] of [
+    ['/v1/kms/generate-tenant-keys', { workspace_id: workspace }, env.KMS_LIFECYCLE_SECRET],
+    ['/v1/kms/revoke-tenant-keys', { workspace_id: workspace }, env.KMS_LIFECYCLE_SECRET],
+    ['/v1/crypto/hash-index', { workspace_id: workspace, values: { borrower_id: 'x' } }, env.KMS_INTERNAL_SECRET],
+    ['/v1/crypto/encrypt', { workspace_id: workspace, id, payload: {} }, env.KMS_INTERNAL_SECRET],
+    ['/v1/crypto/decrypt', { workspace_id: workspace, items: [{ id, ciphertext: '', nonce: '', auth_tag: '' }] }, env.KMS_INTERNAL_SECRET],
+  ]) {
+    const response = await handleRequest(request(path, body, secret), custom, async () => { touched = true; return true; });
+    assert.equal(response.status, 503);
+  }
+  assert.equal(touched, false);
+});
 
 test('gateway denies unauthorized requests and fails closed for missing keys', async () => {
   assert.equal((await call('/v1/crypto/hash-index', { workspace_id: workspace, values: { borrower_id: 'a' } }, 'wrong')).status, 401);
@@ -96,6 +133,42 @@ test('revocation blocks crypto even when KV deletion fails', async () => {
   assert.equal((await callCustom('/v1/kms/revoke-tenant-keys', { workspace_id: workspace })).status, 503);
   assert.equal(state, 'revoking');
   assert.equal((await callCustom('/v1/crypto/hash-index', { workspace_id: workspace, values: { borrower_id: 'x' } })).status, 404);
+});
+
+test('interrupted revocation can retry safely and completed revocation is idempotent', async () => {
+  let state = 'active';
+  let deletes = 0;
+  const coordinator = async (action) => {
+    if (action === 'claim_revoke' && state === 'active') { state = 'revoking'; return true; }
+    if (action === 'is_revoking') return state === 'revoking';
+    if (action === 'is_revoked') return state === 'revoked';
+    if (action === 'finish_revoke' && state === 'revoking') { state = 'revoked'; return true; }
+    return false;
+  };
+  const custom = { ...env, KEYS: { delete: async () => { if (++deletes === 1) throw new Error('temporary failure'); } } };
+  const revoke = () => handleRequest(request('/v1/kms/revoke-tenant-keys', { workspace_id: workspace }, env.KMS_LIFECYCLE_SECRET), custom, coordinator);
+  assert.equal((await revoke()).status, 503);
+  assert.equal(state, 'revoking');
+  assert.equal((await revoke()).status, 200);
+  assert.equal(state, 'revoked');
+  assert.equal((await revoke()).status, 200);
+  assert.equal(deletes, 2);
+});
+
+test('concurrent revocations both finish without reactivating the workspace', async () => {
+  let state = 'active';
+  const coordinator = async (action) => {
+    if (action === 'claim_revoke' && state === 'active') { state = 'revoking'; return true; }
+    if (action === 'is_revoking') return state === 'revoking';
+    if (action === 'is_revoked') return state === 'revoked';
+    if (action === 'finish_revoke' && state === 'revoking') { state = 'revoked'; return true; }
+    return false;
+  };
+  const custom = { ...env, KEYS: { delete: async () => { await new Promise((resolve) => setTimeout(resolve, 5)); } } };
+  const revoke = () => handleRequest(request('/v1/kms/revoke-tenant-keys', { workspace_id: workspace }, env.KMS_LIFECYCLE_SECRET), custom, coordinator);
+  const responses = await Promise.all([revoke(), revoke()]);
+  assert.deepEqual(responses.map((response) => response.status), [200, 200]);
+  assert.equal(state, 'revoked');
 });
 
 test('an existing KV entry is not overwritten by provisioning', async () => {

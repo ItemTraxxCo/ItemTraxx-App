@@ -5,7 +5,7 @@ export function resolveGatewayOrigin(localOrigin: string | undefined): string {
   if (!localOrigin) return 'https://sgw.itemtraxx.com';
   try {
     const url = new URL(localOrigin);
-    if (url.protocol !== 'http:' || url.hostname !== '127.0.0.1' || !url.port || url.username || url.password || url.pathname !== '/' || url.search || url.hash) throw new Error();
+    if (url.protocol !== 'http:' || url.hostname !== '127.0.0.1' || !url.port || url.username || url.password || url.href !== `${url.origin}/`) throw new Error();
     return url.origin;
   } catch { throw new Error('Gateway unavailable'); }
 }

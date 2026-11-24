@@ -10,6 +10,7 @@ export type WorkspacePurgeProfile = {
 /** Side effects the purge needs, injected so the orchestration is unit-testable. */
 export type WorkspacePurgeDeps = {
   claim: (limit: number) => Promise<WorkspacePurgeClaim[]>;
+  ensureKeyRevoked: (workspaceId: string) => Promise<void>;
   listProfiles: (workspaceId: string) => Promise<WorkspacePurgeProfile[]>;
   deleteBetterAuthUser: (profileId: string, workspaceId: string) => Promise<void>;
   deleteBetterAuthOrganization: (organizationId: string) => Promise<void>;
@@ -55,6 +56,7 @@ export const purgeExpiredWorkspaces = async (
 
   for (const workspace of claimed) {
     try {
+      await deps.ensureKeyRevoked(workspace.id);
       const profiles = await deps.listProfiles(workspace.id);
       for (const profile of profiles) {
         try {

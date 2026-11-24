@@ -54,14 +54,20 @@ export async function handleRequest(request, env, transition = coordinate) {
     const secret = path.startsWith('/v1/kms/') ? env.KMS_LIFECYCLE_SECRET : env.KMS_INTERNAL_SECRET;
     if (typeof secret !== 'string' || secret.length < 32 || !await equalSecret(supplied, `Bearer ${secret}`)) return json(401, { error: 'Unauthorized' });
     if (!['/v1/crypto/encrypt', '/v1/crypto/decrypt', '/v1/crypto/hash-index', '/v1/kms/generate-tenant-keys', '/v1/kms/revoke-tenant-keys'].includes(path)) return json(404, { error: 'Not found' });
+    if (env.SGW_RESTORE_HOLD === 'true') return json(503, { error: 'Gateway temporarily unavailable' });
     let body;
     try { body = await readBody(request); } catch { return json(400, { error: 'Invalid request' }); }
     if (!object(body) || typeof body.workspace_id !== 'string' || !UUID.test(body.workspace_id)) return json(400, { error: 'Invalid request' });
     body.workspace_id = body.workspace_id.toLowerCase();
     if (path.startsWith('/v1/kms/')) {
       const provision = path.endsWith('/generate-tenant-keys');
+      if (provision && env.SGW_PROVISIONING_ENABLED !== 'true') return json(503, { error: 'Key provisioning disabled' });
       try {
-        if (!await transition(provision ? 'claim_provision' : 'claim_revoke', body.workspace_id, env)) return json(409, { error: 'Lifecycle transition unavailable' });
+        if (!await transition(provision ? 'claim_provision' : 'claim_revoke', body.workspace_id, env)) {
+          if (provision) return json(409, { error: 'Lifecycle transition unavailable' });
+          if (await transition('is_revoked', body.workspace_id, env)) return json(200, { status: 'revoked' });
+          if (!await transition('is_revoking', body.workspace_id, env)) return json(409, { error: 'Lifecycle transition unavailable' });
+        }
         if (provision) {
           if (await env.KEYS.get(body.workspace_id) !== null) return json(409, { error: 'Key already exists; reconciliation required' });
           const kek = Uint8Array.from(atob(env.MASTER_KEK), (char) => char.charCodeAt(0));
@@ -70,7 +76,9 @@ export async function handleRequest(request, env, transition = coordinate) {
         } else {
           await env.KEYS.delete(body.workspace_id);
         }
-        if (!await transition(provision ? 'finish_provision' : 'finish_revoke', body.workspace_id, env)) throw new Error('Incomplete transition');
+        if (!await transition(provision ? 'finish_provision' : 'finish_revoke', body.workspace_id, env)) {
+          if (provision || !await transition('is_revoked', body.workspace_id, env)) throw new Error('Incomplete transition');
+        }
         return json(200, { status: provision ? 'active' : 'revoked' });
       } catch { return json(503, { error: 'Lifecycle operation incomplete; reconciliation required' }); }
     }

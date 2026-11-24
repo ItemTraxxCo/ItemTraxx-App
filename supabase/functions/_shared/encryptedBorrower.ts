@@ -7,14 +7,22 @@ export async function hashBorrowerId(workspaceId: string, borrowerId: string, se
   return result.borrower_id_hash;
 }
 export async function decryptBorrower(workspaceId: string, row: EncryptedRow, secret: string, gateway: Gateway = callGateway) {
-  if (!row.encrypted_data || !row.nonce || !row.auth_tag || row.key_version !== 1) throw new Error('Encrypted borrower unavailable');
-  const result = await gateway('decrypt', { workspace_id: workspaceId, items: [{ id: row.id, ciphertext: row.encrypted_data, nonce: row.nonce, auth_tag: row.auth_tag }] }, secret);
-  if (!Array.isArray(result.items) || result.items.length !== 1 || result.items[0]?.id !== row.id) throw new Error('Encrypted borrower unavailable');
-  const payload = result.items[0]?.payload;
-  if (!payload || typeof payload.borrower_id !== 'string') throw new Error('Encrypted borrower unavailable');
+  return (await decryptBorrowers(workspaceId, [row], secret, gateway))[0];
+}
+export async function decryptBorrowers(workspaceId: string, rows: EncryptedRow[], secret: string, gateway: Gateway = callGateway) {
+  if (rows.length > 100 || new Set(rows.map(row => row.id)).size !== rows.length || rows.some(row => !row.encrypted_data || !row.nonce || !row.auth_tag || row.key_version !== 1)) throw new Error('Encrypted borrower unavailable');
+  if (!rows.length) return [];
+  const result = await gateway('decrypt', { workspace_id: workspaceId, items: rows.map(row => ({ id: row.id, ciphertext: row.encrypted_data, nonce: row.nonce, auth_tag: row.auth_tag })) }, secret);
+  if (!Array.isArray(result.items) || result.items.length !== rows.length) throw new Error('Encrypted borrower unavailable');
+  const items = result.items;
+  return rows.map((row, index) => {
+  if (items[index]?.id !== row.id) throw new Error('Encrypted borrower unavailable');
+  const payload = items[index]?.payload;
+  if (!payload || typeof payload.borrower_id !== 'string' || !payload.borrower_id.trim()) throw new Error('Encrypted borrower unavailable');
   const first = typeof payload.first_name === 'string' ? payload.first_name.trim() : '';
   const last = typeof payload.last_name === 'string' ? payload.last_name.trim() : '';
   const username = first ? [first, last].filter(Boolean).join(' ') : typeof payload.username === 'string' ? payload.username.trim() : '';
   if (!username) throw new Error('Encrypted borrower unavailable');
   return { username, borrower_id: payload.borrower_id as string };
+  });
 }

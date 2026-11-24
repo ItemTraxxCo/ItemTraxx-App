@@ -8,6 +8,7 @@ import { resolveRateLimitResult } from "../_shared/preloginGuards.ts";
 import { readJsonBody } from "../_shared/requestBody.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 import { requireEnum, requireUuid, ValidationError } from "../_shared/validation.ts";
+import { decryptBorrowers } from "../_shared/encryptedBorrower.ts";
 import {
   containsQuickReturn,
   type OfflineSyncItem,
@@ -61,6 +62,13 @@ type BorrowerRow = {
   username: string;
   borrower_id: string;
   access_mode: string;
+};
+type EncryptedBorrowerRow = {
+  id: string;
+  encrypted_data: string | null;
+  nonce: string | null;
+  auth_tag: string | null;
+  key_version: number | null;
 };
 
 const publicItemState = (item: ItemRow | null) =>
@@ -145,6 +153,8 @@ serve(async (req) => {
       return jsonResponse(403, { error: "Access denied" });
     }
     const profile = profileRow as Profile;
+    const encryptedMode = Deno.env.get("ITX_ENCRYPTED_BORROWERS_LOCAL") === "true";
+    const gatewaySecret = Deno.env.get("ITX_SGW_INTERNAL_SECRET") ?? "";
 
     const body = await readJsonBody(req, 256 * 1024);
     const action = requireEnum(body.action, ACTIONS);
@@ -219,10 +229,12 @@ serve(async (req) => {
           .select("id", { count: "exact", head: true })
           .eq("workspace_id", profile.workspace_id).is("deleted_at", null)
           .not("barcode", "is", null),
-        userClient.from("borrowers")
+        (() => {
+          const query = userClient.from("borrowers")
           .select("id", { count: "exact", head: true })
-          .eq("workspace_id", profile.workspace_id).is("deleted_at", null)
-          .not("borrower_id", "is", null),
+          .eq("workspace_id", profile.workspace_id).is("deleted_at", null);
+          return encryptedMode ? query : query.not("borrower_id", "is", null);
+        })(),
       ]);
       if (itemsCountResult.error || borrowersCountResult.error) {
         throw new Error("Unable to count offline checkout records.");
@@ -327,10 +339,10 @@ serve(async (req) => {
           .select("id,name,barcode,status,checked_out_by,access_mode")
           .eq("workspace_id", profile.workspace_id).is("deleted_at", null)
           .not("barcode", "is", null);
-        const borrowerQuery = userClient.from("borrowers")
-          .select("id,username,borrower_id,access_mode")
-          .eq("workspace_id", profile.workspace_id).is("deleted_at", null)
-          .not("borrower_id", "is", null);
+        let borrowerQuery = userClient.from("borrowers")
+          .select(encryptedMode ? "id,encrypted_data,nonce,auth_tag,key_version" : "id,username,borrower_id,access_mode")
+          .eq("workspace_id", profile.workspace_id).is("deleted_at", null);
+        if (!encryptedMode) borrowerQuery = borrowerQuery.not("borrower_id", "is", null);
         const [itemsResult, borrowersResult] = await Promise.all([
           (afterItemId ? itemQuery.gt("id", afterItemId) : itemQuery)
             .order("id").limit(PACK_CHUNK_SIZE),
@@ -341,7 +353,11 @@ serve(async (req) => {
           throw new Error("Unable to load the next offline pack chunk.");
         }
         const items = (itemsResult.data ?? []) as ItemRow[];
-        const borrowers = (borrowersResult.data ?? []) as BorrowerRow[];
+        const borrowerRows = (borrowersResult.data ?? []) as unknown as EncryptedBorrowerRow[];
+        const borrowers = encryptedMode
+          ? (await decryptBorrowers(profile.workspace_id, borrowerRows as unknown as EncryptedBorrowerRow[], gatewaySecret))
+            .map((payload, index) => ({ id: borrowerRows[index].id, ...payload }))
+          : borrowerRows as unknown as BorrowerRow[];
         const chunkData = {
           items: items.map(({ id, name, barcode, status, checked_out_by }) => ({
             id,
@@ -486,11 +502,11 @@ serve(async (req) => {
       const [borrowerResult, logResult] = await Promise.all([
         current.checked_out_by
           ? adminClient.from("borrowers")
-            .select("username,borrower_id")
+            .select(encryptedMode ? "id,encrypted_data,nonce,auth_tag,key_version" : "username,borrower_id")
             .eq("id", current.checked_out_by)
             .eq("workspace_id", profile.workspace_id)
             .maybeSingle()
-          : Promise.resolve({ data: null }),
+          : Promise.resolve({ data: null, error: null }),
         adminClient.from("item_logs")
           .select("performed_by,action_type,action_time")
           .eq("workspace_id", profile.workspace_id)
@@ -499,6 +515,12 @@ serve(async (req) => {
           .limit(1)
           .maybeSingle(),
       ]);
+      if (borrowerResult.error) throw new Error("Unable to load offline borrower.");
+      const borrowerDetails = current.checked_out_by && encryptedMode
+        ? (borrowerResult.data
+          ? (await decryptBorrowers(profile.workspace_id, [borrowerResult.data as unknown as EncryptedBorrowerRow], gatewaySecret))[0]
+          : (() => { throw new Error("Encrypted borrower unavailable"); })())
+        : borrowerResult.data as { username?: string | null; borrower_id?: string | null } | null;
       const log = logResult.data as {
         performed_by?: string | null;
         action_type?: string | null;
@@ -514,8 +536,8 @@ serve(async (req) => {
       return {
         ...publicItemState(current),
         checked_out_by: current.checked_out_by,
-        borrower_username: borrowerResult.data?.username ?? null,
-        borrower_display_id: borrowerResult.data?.borrower_id ?? null,
+        borrower_username: borrowerDetails?.username ?? null,
+        borrower_display_id: borrowerDetails?.borrower_id ?? null,
         ...(profile.role === "tenant_account"
           ? { performed_by_email: null }
           : { performed_by_email: actor?.auth_email ?? null }),
@@ -768,7 +790,7 @@ serve(async (req) => {
               device_id: deviceId,
               operation_id: operation.operation_id,
               offline_payload: conflicts,
-              server_state: itemResults,
+              server_state: encryptedMode ? sanitizeStoredItemResults(itemResults) : itemResults,
             });
           if (error && error.code !== "23505") {
             throw new Error("Unable to save offline conflict.");
@@ -914,7 +936,7 @@ serve(async (req) => {
 
     if (!allResolved) {
       await adminClient.from("offline_checkout_conflicts").update({
-        server_state: resolutionResults,
+        server_state: encryptedMode ? sanitizeStoredItemResults(resolutionResults) : resolutionResults,
       }).eq("id", conflict.id).eq("status", "pending");
       return jsonResponse(409, {
         data: {
@@ -934,7 +956,7 @@ serve(async (req) => {
       .from("offline_checkout_conflicts").update({
         status: resolvedStatus,
         resolution,
-        resolution_result: resolutionResults,
+        resolution_result: encryptedMode ? sanitizeStoredItemResults(resolutionResults) : resolutionResults,
         resolved_at: resolvedAt,
         resolved_by: profile.id,
       }).eq("id", conflict.id).eq("status", "pending").select("id")

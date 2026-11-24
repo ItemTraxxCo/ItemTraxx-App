@@ -10,6 +10,7 @@ import { resolveCorsHeaders } from "../_shared/cors.ts";
 import { readJsonBody } from "../_shared/requestBody.ts";
 import { rpcErrorToError, throwOnRpcError } from "./reportingRefresh.ts";
 import { callBetterAuthAdmin } from "../_shared/betterAuthAdmin.ts";
+import { ensureWorkspaceKeyRevoked, revokeWorkspaceKey } from "../_shared/sgwLifecycle.ts";
 import { purgeExpiredWorkspaces, type WorkspacePurgeDeps } from "./workspacePurge.ts";
 import {
   asRecord,
@@ -1141,6 +1142,13 @@ serve((req) => withRequestSpan(req, "POST /functions/job-worker", async (span, r
       const purgeDeps: WorkspacePurgeDeps = {
         claim: async (claimLimit) =>
           unwrap(await adminClient.rpc("claim_workspaces_due_for_purge", { p_limit: claimLimit })) ?? [],
+        ensureKeyRevoked: async (workspaceId) => {
+          const { data, error } = await adminClient.from("sgw_workspace_key_lifecycle")
+            .select("state").eq("workspace_id", workspaceId).maybeSingle();
+          if (error) throw new Error("Workspace key revocation requires reconciliation");
+          await ensureWorkspaceKeyRevoked(data?.state ?? null, () =>
+            revokeWorkspaceKey(workspaceId, Deno.env.get("ITX_SGW_LIFECYCLE_SECRET") ?? ""));
+        },
         listProfiles: async (workspaceId) =>
           unwrap(
             await adminClient.from("profiles").select("id").eq("workspace_id", workspaceId),

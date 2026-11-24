@@ -32,6 +32,7 @@ import {
 } from "./passwordResetRedirect.ts";
 import { sendAccountEmail } from "./accountEmailDelivery.ts";
 import { recordPasskeyUsage } from "./passkeyUsage.ts";
+import { ensureWorkspaceAdminMembership } from "./workspaceMembership.ts";
 import {
   normalizeBetterAuthCaptchaRequest,
   normalizeBetterAuthPathname,
@@ -1424,6 +1425,7 @@ export const handleInternalAuthAdminRequest = async (request: Request, rawEnv: E
       const workspaceId = typeof body?.workspaceId === "string" ? body.workspaceId : null;
       if (!profileId || !email || password.length < 12) return Response.json({ error: "Invalid request" }, { status: 400 });
       const userId = crypto.randomUUID(), accountId = crypto.randomUUID();
+      const memberId = workspaceId ? crypto.randomUUID() : null;
       const passwordHash = await hashPassword(password);
       const memberRole = body?.profileRole === "workspace_admin"
         ? "workspace_admin"
@@ -1433,20 +1435,23 @@ export const handleInternalAuthAdminRequest = async (request: Request, rawEnv: E
       const { error } = await cachedDataClient.schema("public").rpc("better_auth_create_user", {
         p_profile_id: profileId, p_user_id: userId, p_account_id: accountId,
         p_email: email, p_name: name, p_global_role: role, p_password_hash: passwordHash,
-        p_workspace_id: workspaceId, p_member_id: workspaceId ? crypto.randomUUID() : null,
+        p_workspace_id: workspaceId, p_member_id: memberId,
         p_member_role: workspaceId ? memberRole : null,
       });
       if (error) throw error;
       if (workspaceId && memberRole === "workspace_admin") {
-        const { data: membership, error: membershipError } = await cachedDataClient.schema("better_auth")
-          .from("member")
-          .update({ role: "admin" })
-          .eq("userId", userId)
-          .eq("role", "workspace_admin")
-          .select("id")
-          .maybeSingle();
-        if (membershipError) throw membershipError;
-        if (!membership?.id) throw new Error("Workspace admin membership could not be synchronized");
+        const dataClient = cachedDataClient;
+        await ensureWorkspaceAdminMembership(async () => {
+          const { data, error } = await dataClient.schema("better_auth").from("member")
+            .select("id,role").eq("id", memberId).eq("userId", userId).maybeSingle();
+          if (error) throw error;
+          return data;
+        }, async (id) => {
+          const { data, error } = await dataClient.schema("better_auth").from("member")
+            .update({ role: "admin" }).eq("id", id).eq("role", "workspace_admin").select("id").maybeSingle();
+          if (error) throw error;
+          return Boolean(data?.id);
+        });
       }
       return Response.json({ user: { id: profileId, betterAuthUserId: userId, email } });
     }

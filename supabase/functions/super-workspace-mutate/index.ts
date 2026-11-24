@@ -8,6 +8,7 @@ import { readJsonBody } from "../_shared/requestBody.ts";
 import { hasFreshPrivilegedStepUp } from "../_shared/privilegedStepUp.ts";
 import { isSuperAdminTokenBlockedBySessionRevocation } from "../_shared/superAdminSessions.ts";
 import { callBetterAuthAdmin } from "../_shared/betterAuthAdmin.ts";
+import { provisionAndActivateWorkspace, provisionWorkspaceKey } from "../_shared/sgwLifecycle.ts";
 import {
   optionalText,
   requireEmail,
@@ -261,6 +262,11 @@ serve(async (req) => {
       const row = (await load(id))[0];
       return row?.account_category === "individual" ? row : null;
     };
+    const encryptionReady = async (id: string) => {
+      const { data, error } = await admin.from("sgw_workspace_key_lifecycle")
+        .select("state").eq("workspace_id", id).maybeSingle();
+      return !error && data?.state === "active";
+    };
     const individualLifecycleValues = (status: string) => {
       const now = new Date().toISOString();
       return status === "archived"
@@ -329,19 +335,27 @@ serve(async (req) => {
       if (existingError) return json(400, { error: "Unable to verify individual account." });
       if (existingProfile?.workspace_id) {
         const existing = await loadIndividualAccount(existingProfile.workspace_id);
-        if (existing) return json(200, { data: individualAccountView(existing) });
+        if (existing) {
+          if (Deno.env.get("ITX_SGW_PROVISION_NEW_WORKSPACES") === "true" && (existing.status !== "active" || !await encryptionReady(existing.id))) {
+            return json(503, { error: "Account encryption setup requires administrator reconciliation." });
+          }
+          return json(200, { data: individualAccountView(existing) });
+        }
       }
       const auditId = await startAudit("create_individual_account", null, {
         name,
         account_category: "individual",
       });
+      const provisionKeys = Deno.env.get("ITX_SGW_PROVISION_NEW_WORKSPACES") === "true";
+      const lifecycleSecret = Deno.env.get("ITX_SGW_LIFECYCLE_SECRET") ?? "";
+      if (provisionKeys && lifecycleSecret.length < 32) return json(503, { error: "Workspace encryption is not configured." });
       // The database and Better Auth organization table require a unique slug.
       // This value is internal only and is never returned to the admin UI.
       const internalSlug = `individual-${crypto.randomUUID()}`;
       const { data: w, error } = await admin.from("workspaces").insert({
         name,
         slug: internalSlug,
-        status: "active",
+        status: provisionKeys ? "suspended" : "active",
       }).select("id").single();
       if (error || !w) return json(400, { error: "Unable to create individual account." });
       const { error: policyError } = await admin.from("workspace_policies").upsert({
@@ -409,6 +423,14 @@ serve(async (req) => {
         await callBetterAuthAdmin({ action: "delete_organization", organizationId: organization.organization.id }).catch(() => undefined);
         await admin.from("workspaces").delete().eq("id", w.id);
         return json(400, { error: "Unable to assign individual account sign-in." });
+      }
+      if (provisionKeys) {
+        try {
+          await provisionAndActivateWorkspace(() => provisionWorkspaceKey(w.id, lifecycleSecret), async () => {
+            const { data, error } = await admin.from("workspaces").update({ status: "active" }).eq("id", w.id).eq("status", "suspended").is("archived_at", null).select("id").maybeSingle();
+            if (error || !data) throw new Error("Workspace activation failed");
+          });
+        } catch { return json(503, { error: "Account creation requires administrator reconciliation before use." }); }
       }
       await completeAudit(auditId, w.id, { name, account_category: "individual" });
       return json(200, { data: individualAccountView((await load(w.id))[0]) });
@@ -514,6 +536,9 @@ serve(async (req) => {
       if (!(status === "active" || status === "suspended" || status === "archived")) {
         throw new ValidationError("Invalid individual account status.");
       }
+      if (status === "active" && Deno.env.get("ITX_SGW_PROVISION_NEW_WORKSPACES") === "true" && !await encryptionReady(id)) {
+        return json(503, { error: "Account encryption setup requires administrator reconciliation." });
+      }
       if (!(await loadIndividualAccount(id))) return json(404, { error: "Individual account not found." });
       const auditId = await startAudit("set_individual_account_status", id, { status });
       const { error } = await admin.from("workspaces").update(individualLifecycleValues(status)).eq("id", id);
@@ -558,10 +583,13 @@ serve(async (req) => {
         slug,
         account_category: policy.account_category,
       });
+      const provisionKeys = Deno.env.get("ITX_SGW_PROVISION_NEW_WORKSPACES") === "true";
+      const lifecycleSecret = Deno.env.get("ITX_SGW_LIFECYCLE_SECRET") ?? "";
+      if (provisionKeys && lifecycleSecret.length < 32) return json(503, { error: "Workspace encryption is not configured." });
       const { data: w, error } = await admin.from("workspaces").insert({
         name,
         slug,
-        status: "active",
+        status: provisionKeys ? "suspended" : "active",
       }).select("id").single();
       if (error || !w) {
         return json(400, { error: "Unable to create workspace." });
@@ -608,9 +636,24 @@ serve(async (req) => {
         await admin.from("workspaces").delete().eq("id", w.id);
         return json(400, { error: "Unable to create workspace." });
       }
-      await admin.from("workspaces").update({
+      const { error: primaryAdminError } = await admin.from("workspaces").update({
         primary_admin_profile_id: profileId,
       }).eq("id", w.id);
+      if (primaryAdminError) {
+        await admin.from("profiles").delete().eq("id", profileId);
+        await callBetterAuthAdmin({action:"delete_user",profileId,betterAuthUserId:created.user.betterAuthUserId}).catch(()=>undefined);
+        await callBetterAuthAdmin({action:"delete_organization",organizationId:organization.organization.id}).catch(()=>undefined);
+        await admin.from("workspaces").delete().eq("id", w.id);
+        return json(400, { error: "Unable to assign primary Workspace Admin." });
+      }
+      if (provisionKeys) {
+        try {
+          await provisionAndActivateWorkspace(() => provisionWorkspaceKey(w.id, lifecycleSecret), async () => {
+            const { data, error } = await admin.from("workspaces").update({ status: "active" }).eq("id", w.id).eq("status", "suspended").is("archived_at", null).select("id").maybeSingle();
+            if (error || !data) throw new Error("Workspace activation failed");
+          });
+        } catch { return json(503, { error: "Workspace creation requires administrator reconciliation before use." }); }
+      }
       await completeAudit(auditId, w.id, { name, slug, account_category: policy.account_category });
       return json(200, { data: (await load(w.id))[0] });
     }
@@ -649,6 +692,9 @@ serve(async (req) => {
       const id = requireUuid(p.id),
         status = requireText(p.status, { maxLen: 20 }),
         now = new Date().toISOString();
+      if (status === "active" && Deno.env.get("ITX_SGW_PROVISION_NEW_WORKSPACES") === "true" && !await encryptionReady(id)) {
+        return json(503, { error: "Workspace encryption setup requires administrator reconciliation." });
+      }
       const values = status === "archived"
         ? {
           status: "suspended",

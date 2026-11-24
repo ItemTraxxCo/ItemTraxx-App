@@ -320,6 +320,7 @@ try {
       command: "deno",
       args: [
         "test",
+        "--node-modules-dir=none",
         `--allow-env=${edgeFunctionEnvironmentAllowlist}`,
         // Static guards read function sources (query-string binding, admin-ops
         // role wiring); scope reads to the functions tree only.

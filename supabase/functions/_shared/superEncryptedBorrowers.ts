@@ -1,0 +1,22 @@
+import { decryptBorrowers } from './encryptedBorrower.ts';
+import { callGateway } from '../crypto-broker/gateway.ts';
+
+type Row = { id: string; workspace_id: string; encrypted_data: string | null; nonce: string | null; auth_tag: string | null; key_version: number | null };
+type Gateway = (op: 'hash-index' | 'decrypt', body: Record<string, unknown>, secret: string) => Promise<Record<string, unknown>>;
+
+// Call only after super-admin authorization. Never mix workspace keys or return
+// a partial result if any workspace or record fails authentication.
+export async function decryptSuperBorrowers(rows: Row[], secret: string, gateway: Gateway = callGateway) {
+  if (rows.length > 500 || rows.some(row => !row.workspace_id || !row.id) || new Set(rows.map(row => row.id)).size !== rows.length) throw new Error('Borrower data unavailable');
+  const groups = new Map<string, Row[]>();
+  for (const row of rows) groups.set(row.workspace_id, [...(groups.get(row.workspace_id) ?? []), row]);
+  const decrypted = new Map<string, { username: string; borrower_id: string }>();
+  for (const [workspace, group] of groups) {
+    for (let offset = 0; offset < group.length; offset += 100) {
+      const batch = group.slice(offset, offset + 100);
+      const payloads = await decryptBorrowers(workspace, batch, secret, gateway);
+      batch.forEach((item, index) => decrypted.set(item.id, payloads[index]));
+    }
+  }
+  return rows.map(row => ({ id: row.id, workspace_id: row.workspace_id, ...decrypted.get(row.id)! }));
+}

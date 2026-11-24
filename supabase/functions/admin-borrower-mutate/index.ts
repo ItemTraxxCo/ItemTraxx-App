@@ -549,6 +549,12 @@ serve(async (req) => {
 
     }
 
+    // These legacy operations use plaintext identity columns. Encrypted mode
+    // must go through the broker and must never silently fall back to them.
+    if (Deno.env.get("ITX_ENCRYPTED_BORROWERS_LOCAL") === "true" && ["create", "bulk_create", "restore", "list_deleted"].includes(action)) {
+      return jsonResponse(503, { error: "Use encrypted borrower management." });
+    }
+
     if (action === "list_deleted") {
       const { data, error } = await adminClient
         .from("borrowers")

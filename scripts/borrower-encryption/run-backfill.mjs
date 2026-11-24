@@ -18,8 +18,14 @@ try {
   const dataOrFail = ({ data, error }) => { if (error || !data) throw new Error('Database operation failed'); return data; };
   const store = {
     requireFreeze: async (workspace) => {
-      const { data, error } = await db.rpc('borrower_write_freeze_is_active', { p_workspace_id: workspace });
-      if (error || data !== true) throw new Error('Workspace writer freeze required');
+      const { data, error } = await db.rpc('borrower_write_freeze_epoch', { p_workspace_id: workspace });
+      if (error || typeof data !== 'string' || !/^[0-9a-f-]{36}$/i.test(data)) throw new Error('Workspace writer freeze required');
+      return data;
+    },
+    listPreflightPage: async (workspace, cursor, limit) => {
+      let query = db.from('borrowers').select('id,workspace_id,borrower_id').eq('workspace_id', workspace).order('id').limit(limit);
+      if (cursor) query = query.gt('id', cursor);
+      return dataOrFail(await query);
     },
     list: async (workspace, limit) => dataOrFail(await db.from('borrowers').select(columns).eq('workspace_id', workspace).is('encrypted_data', null).order('id').limit(limit)),
     listVerifiedPage: async (workspace, cursor, limit) => {
@@ -28,12 +34,12 @@ try {
       return dataOrFail(await query);
     },
     findHash: async (workspace, hash) => dataOrFail(await db.from('borrowers').select('id').eq('workspace_id', workspace).eq('borrower_id_hash', hash).limit(2)).map((row) => row.id),
-    save: async (row, update) => {
-      const { data, error } = await db.rpc('backfill_encrypted_borrower', {
+    save: async (row, update, freezeEpoch) => {
+      const { data, error } = await db.rpc('backfill_encrypted_borrower_v2', {
         p_workspace_id: row.workspace_id, p_id: row.id, p_expected_username: row.username,
         p_expected_borrower_id: row.borrower_id, p_ciphertext: update.encrypted_data,
         p_nonce: update.nonce, p_auth_tag: update.auth_tag, p_borrower_id_hash: update.borrower_id_hash,
-        p_email_hash: null,
+        p_email_hash: null, p_freeze_epoch: freezeEpoch,
       });
       if (error || typeof data !== 'boolean') throw new Error('Database operation failed');
       return data;

@@ -113,7 +113,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { RouterLink } from "vue-router";
 import BoneyardSkeleton from "../../../components/BoneyardSkeleton.vue";
 import BoneyardTableFixture from "../../../components/BoneyardTableFixture.vue";
@@ -121,6 +121,7 @@ import { fetchItemLogs, type ItemLog } from "../../../services/itemService";
 import { exportRowsToCsv, exportRowsToPdf } from "../../../services/exportService";
 import { useManagerContext } from "../../../composables/useManagerContext";
 import { formatActionLabel, ITEM_LOG_ACTION_OPTIONS } from "../../../utils/actionLabel";
+import { getAuthState } from "../../../store/authState";
 
 const { managerRoot } = useManagerContext();
 
@@ -131,6 +132,8 @@ const searchQuery = ref("");
 const actionFilter = ref("all");
 const dateFrom = ref("");
 const dateTo = ref("");
+const auth = getAuthState();
+let requestVersion = 0;
 const logFixtureHeaders = ["Time", "Action", "Tenant Account", "Borrower", "Item"];
 const isBoneyardCapture =
   import.meta.env.VITE_E2E_TEST_UTILS === "true" &&
@@ -171,14 +174,16 @@ const filteredLogs = computed(() => {
 });
 
 const loadLogs = async () => {
+  const version = ++requestVersion;
   isLoading.value = true;
   error.value = "";
   try {
-    logs.value = await fetchItemLogs();
+    const result = await fetchItemLogs();
+    if (version === requestVersion) logs.value = result;
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Unable to load logs. Please sign out completely and sign back in.";
+    if (version === requestVersion) error.value = err instanceof Error ? err.message : "Unable to load logs. Please sign out completely and sign back in.";
   } finally {
-    isLoading.value = false;
+    if (version === requestVersion) isLoading.value = false;
   }
 };
 
@@ -220,6 +225,15 @@ onMounted(() => {
   if (isBoneyardCapture) return;
   void loadLogs();
 });
+watch(() => [auth.userId, auth.workspaceContextId, auth.isAuthenticated], () => {
+  requestVersion++;
+  logs.value = [];
+  searchQuery.value = '';
+  error.value = '';
+  if (auth.isAuthenticated && auth.workspaceContextId && !isBoneyardCapture) void loadLogs();
+  else isLoading.value = false;
+});
+onUnmounted(() => { requestVersion++; logs.value = []; searchQuery.value = ''; });
 </script>
 
 <style scoped>

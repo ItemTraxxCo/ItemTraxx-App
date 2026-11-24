@@ -23,6 +23,7 @@ import {
   fetchBorrowerDetails,
   fetchBorrowerPage,
   fetchBorrowers,
+  fetchSortedBorrowers,
   fetchDeletedBorrowers,
   restoreBorrower,
   updateBorrowerAccess,
@@ -360,6 +361,15 @@ describe("fetchBorrowerDetails", () => {
 });
 
 describe('encrypted directory preview', () => {
+  it('sorts decrypted records across pages by name before pagination', async () => {
+    vi.stubEnv('VITE_ENCRYPTED_BORROWERS_LOCAL', 'true');
+    try {
+      mockedInvoke.mockResolvedValueOnce({ ok: true, data: { data: { rows: [{ id: 'z', username: 'Zoe', borrower_id: '2' }], hasMore: true } } } as never)
+        .mockResolvedValueOnce({ ok: true, data: { data: { rows: [{ id: 'a', username: 'Ada', borrower_id: '1' }], hasMore: false } } } as never);
+      expect((await fetchSortedBorrowers()).map(row => row.username)).toEqual(['Ada', 'Zoe']);
+      expect(mockedSelectPage).not.toHaveBeenCalled();
+    } finally { vi.unstubAllEnvs(); }
+  });
   it('loads bounded broker pages and fails closed on broker failure', async () => {
     vi.stubEnv('VITE_ENCRYPTED_BORROWERS_LOCAL', 'true');
     try {

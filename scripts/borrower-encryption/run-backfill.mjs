@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { backfillWorkspace } from './backfill.mjs';
 
-// Run only during the agreed workspace writer freeze. Secrets are env-only.
+// A service-only database freeze must already be active. Secrets are env-only.
 const args = process.argv.slice(2);
 const workspaceId = args[0];
 if (args.length !== 3 || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(workspaceId ?? '') || args[1] !== '--execute' || args[2] !== '--writers-paused') {
@@ -17,6 +17,10 @@ try {
   const columns = 'id,workspace_id,username,borrower_id,encrypted_data,nonce,auth_tag,key_version,borrower_id_hash';
   const dataOrFail = ({ data, error }) => { if (error || !data) throw new Error('Database operation failed'); return data; };
   const store = {
+    requireFreeze: async (workspace) => {
+      const { data, error } = await db.rpc('borrower_write_freeze_is_active', { p_workspace_id: workspace });
+      if (error || data !== true) throw new Error('Workspace writer freeze required');
+    },
     list: async (workspace, limit) => dataOrFail(await db.from('borrowers').select(columns).eq('workspace_id', workspace).is('encrypted_data', null).order('id').limit(limit)),
     listVerifiedPage: async (workspace, cursor, limit) => {
       let query = db.from('borrowers').select(columns).eq('workspace_id', workspace).not('encrypted_data', 'is', null).order('id').limit(limit);
@@ -25,8 +29,14 @@ try {
     },
     findHash: async (workspace, hash) => dataOrFail(await db.from('borrowers').select('id').eq('workspace_id', workspace).eq('borrower_id_hash', hash).limit(2)).map((row) => row.id),
     save: async (row, update) => {
-      const result = await db.from('borrowers').update(update).eq('id', row.id).eq('workspace_id', row.workspace_id).eq('username', row.username).eq('borrower_id', row.borrower_id).is('encrypted_data', null).select('id');
-      return dataOrFail(result).length === 1;
+      const { data, error } = await db.rpc('backfill_encrypted_borrower', {
+        p_workspace_id: row.workspace_id, p_id: row.id, p_expected_username: row.username,
+        p_expected_borrower_id: row.borrower_id, p_ciphertext: update.encrypted_data,
+        p_nonce: update.nonce, p_auth_tag: update.auth_tag, p_borrower_id_hash: update.borrower_id_hash,
+        p_email_hash: null,
+      });
+      if (error || typeof data !== 'boolean') throw new Error('Database operation failed');
+      return data;
     },
     read: async (workspace, id) => dataOrFail(await db.from('borrowers').select(columns).eq('workspace_id', workspace).eq('id', id)).at(0),
   };

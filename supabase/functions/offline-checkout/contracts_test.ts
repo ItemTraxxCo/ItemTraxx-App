@@ -3,8 +3,14 @@ import {
   containsQuickReturn,
   intendedState,
   parseSyncOperations,
+  sanitizeStoredItemResults,
   visibleCheckedOutBy,
 } from "./contracts.ts";
+
+Deno.test("stored offline conflict snapshots exclude borrower and actor details", () => {
+  const result = sanitizeStoredItemResults([{ item_id: "item", barcode: "camera", status: "needs_review", server_state: { id: "item", name: "Camera", barcode: "camera", status: "checked_out", checked_out_by: "borrower-uuid", borrower_username: "Private Name", borrower_display_id: "Private ID", performed_by_email: "private@example.test" }, extra: "private" }]);
+  assertEquals(result, [{ item_id: "item", barcode: "camera", status: "needs_review", server_state: { id: "item", name: "Camera", barcode: "camera", status: "checked_out", checked_out_by: null } }]);
+});
 
 const assertEquals = (actual: unknown, expected: unknown) => {
   if (JSON.stringify(actual) !== JSON.stringify(expected)) {

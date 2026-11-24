@@ -3,6 +3,7 @@ export async function backfillWorkspace({ workspaceId, store, gateway, delayMs =
   if (!workspaceId || !Number.isFinite(delayMs) || delayMs < 1) throw new Error('Invalid backfill configuration');
   let migrated = 0;
   while (true) {
+    await store.requireFreeze(workspaceId);
     const rows = await store.list(workspaceId, 50);
     if (!Array.isArray(rows) || rows.length > 50) throw new Error('Invalid backfill page');
     if (rows.length === 0) break;
@@ -27,6 +28,7 @@ export async function backfillWorkspace({ workspaceId, store, gateway, delayMs =
   }
   let cursor = '';
   for (;;) {
+    await store.requireFreeze(workspaceId);
     const rows = await store.listVerifiedPage(workspaceId, cursor, 50);
     if (!Array.isArray(rows) || rows.length > 50) throw new Error('Invalid verification page');
     if (!rows.length) break;
@@ -42,5 +44,6 @@ export async function backfillWorkspace({ workspaceId, store, gateway, delayMs =
       await sleep(delayMs);
     }
   }
+  await store.requireFreeze(workspaceId);
   return { migrated };
 }

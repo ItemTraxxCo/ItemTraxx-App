@@ -835,6 +835,18 @@ Deno.test("shared replay store rejects an envelope another isolate already claim
   });
 });
 
+Deno.test("shared replay store uses Supabase secret API keys only in the apikey header", async () => {
+  await withSharedReplayStore((request) => {
+    assert(request.headers.get("apikey") === "sb_secret_test_key", "expected the secret API key");
+    assert(request.headers.get("authorization") === null, "secret API keys are not bearer JWTs");
+    return Response.json(true);
+  }, async () => {
+    Deno.env.set("ITX_SECRET_KEY", "sb_secret_test_key");
+    const request = await makeSignedIngressRequest({ requestId: "shared-store-secret-api-key" });
+    await assertIngressAccepted(request, "secret API key");
+  });
+});
+
 Deno.test("shared replay store fails closed when the claim cannot be confirmed", async () => {
   for (
     const [label, respond] of [

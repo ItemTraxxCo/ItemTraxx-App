@@ -41,6 +41,9 @@ export const createSuperBorrower = async (payload: {
   workspace_id: string;
   username?: string;
   borrower_id?: string;
+  first_name?: string;
+  last_name?: string | null;
+  email?: string | null;
 }) =>
   callSuperBorrower<SuperBorrowerItem>({
     action: "create",

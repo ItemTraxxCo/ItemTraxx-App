@@ -25,6 +25,7 @@ export type BorrowerDetails = {
 type MaybeRelation<T> = T | T[] | null;
 const ADMIN_LIST_PAGE_SIZE = 500;
 const encryptedDirectoryPreview = () => import.meta.env.DEV && import.meta.env.VITE_ENCRYPTED_BORROWERS_LOCAL === "true";
+export const isEncryptedBorrowerDirectoryEnabled = encryptedDirectoryPreview;
 const ACCESS_GRANT_BATCH_SIZE = 100;
 
 const pickRelation = <T>(value: MaybeRelation<T>): T | null => {
@@ -56,6 +57,11 @@ export const fetchBorrowers = async () => {
     page += 1;
   }
 };
+
+export const fetchSortedBorrowers = async () =>
+  (await fetchBorrowers()).sort((left, right) =>
+    left.username.localeCompare(right.username, undefined, { sensitivity: "base" }) || left.id.localeCompare(right.id)
+  );
 
 export const fetchBorrowerPage = async (
   page = 0,

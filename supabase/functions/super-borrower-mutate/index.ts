@@ -13,8 +13,11 @@ import { writeSuperAdminAudit } from "../_shared/superAdminAudit.ts";
 import { resolveCorsHeaders } from "../_shared/cors.ts";
 import { readJsonBody } from "../_shared/requestBody.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
+import { decryptSuperBorrowers } from "../_shared/superEncryptedBorrowers.ts";
+import { callGateway } from "../crypto-broker/gateway.ts";
 import {
   optionalText,
+  requireText,
   requireUuid,
   BORROWER_ID_PATTERN,
   USERNAME_PATTERN,
@@ -57,7 +60,7 @@ type SuperBorrowerDatabase = {
       };
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: { super_create_encrypted_borrower: { Args: { p_id: string; p_workspace_id: string; p_actor_id: string; p_encrypted_data: string; p_nonce: string; p_auth_tag: string; p_borrower_id_hash: string; p_borrower_email_hash: string | null }; Returns: string }; super_delete_encrypted_borrower: { Args: { p_id: string; p_actor_id: string }; Returns: boolean } };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
   };
@@ -310,6 +313,8 @@ serve(async (req) => {
       return jsonResponse(400, { error: "Invalid request" });
     }
     const payloadRecord = payload as Record<string, unknown>;
+    const encryptedMode = Deno.env.get("ITX_ENCRYPTED_BORROWERS_LOCAL") === "true";
+    // The legacy update action is a read-only detail lookup.
 
     if (action === "list") {
       const workspaceId = optionalText(payloadRecord.workspace_id, { maxLen: 36 }) || "all";
@@ -320,7 +325,7 @@ serve(async (req) => {
 
       let query = adminClient
         .from("borrowers")
-        .select("id, workspace_id, username, borrower_id, created_at")
+        .select(encryptedMode ? "id,workspace_id,encrypted_data,nonce,auth_tag,key_version,created_at" : "id, workspace_id, username, borrower_id, created_at")
         .order("created_at", { ascending: false })
         .limit(500);
 
@@ -331,13 +336,16 @@ serve(async (req) => {
       if (error) {
         return jsonResponse(400, { error: "Unable to load borrowers." });
       }
-      const rows = (data ?? []) as Array<{
+      const sourceRows = (data ?? []) as unknown as Array<{
         id: string;
         workspace_id: string;
         username: string;
         borrower_id: string;
         created_at: string;
       }>;
+      const rows = encryptedMode
+        ? (await decryptSuperBorrowers(sourceRows as unknown as Parameters<typeof decryptSuperBorrowers>[0], Deno.env.get("ITX_SGW_INTERNAL_SECRET") ?? "")).map((row, index) => ({ ...row, created_at: sourceRows[index].created_at }))
+        : sourceRows;
       if (!search) {
         return jsonResponse(200, { data: rows });
       }
@@ -353,6 +361,20 @@ serve(async (req) => {
 
     if (action === "create") {
       const workspaceId = requireUuid(payloadRecord.workspace_id);
+      if (encryptedMode) {
+        const firstName = requireText(payloadRecord.first_name, { maxLen: 100 });
+        const lastName = optionalText(payloadRecord.last_name, { maxLen: 100 });
+        const borrowerId = requireText(payloadRecord.borrower_id, { maxLen: 32, pattern: /^[a-z0-9]+$/i });
+        const email = optionalText(payloadRecord.email, { maxLen: 254 });
+        if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new ValidationError();
+        const id = crypto.randomUUID();
+        const payload = { first_name: firstName, last_name: lastName || null, borrower_id: borrowerId, email: email || null };
+        const encrypted = await callGateway("encrypt", { workspace_id: workspaceId, id, payload, index_fields: { borrower_id: borrowerId, ...(email ? { email } : {}) } }, Deno.env.get("ITX_SGW_INTERNAL_SECRET") ?? "");
+        if (typeof encrypted.ciphertext !== "string" || !encrypted.ciphertext || typeof encrypted.nonce !== "string" || !encrypted.nonce || typeof encrypted.auth_tag !== "string" || !encrypted.auth_tag || typeof encrypted.borrower_id_hash !== "string" || !/^[a-f0-9]{64}$/.test(encrypted.borrower_id_hash) || (email && (typeof encrypted.borrower_email_hash !== "string" || !/^[a-f0-9]{64}$/.test(encrypted.borrower_email_hash)))) throw new Error("Gateway unavailable");
+        const { data, error } = await adminClient.rpc("super_create_encrypted_borrower", { p_id: id, p_workspace_id: workspaceId, p_actor_id: user.id, p_encrypted_data: encrypted.ciphertext, p_nonce: encrypted.nonce, p_auth_tag: encrypted.auth_tag, p_borrower_id_hash: encrypted.borrower_id_hash, p_borrower_email_hash: email ? encrypted.borrower_email_hash as string : null });
+        if (error || data !== id) return jsonResponse(error?.code === "23505" ? 409 : 503, { error: error?.code === "23505" ? "Borrower ID already exists." : "Unable to create borrower." });
+        return jsonResponse(200, { data: { id, workspace_id: workspaceId, username: [firstName, lastName].filter(Boolean).join(" "), borrower_id: borrowerId, created_at: new Date().toISOString() } });
+      }
       const providedBorrowerId = optionalText(payloadRecord.borrower_id, {
         maxLen: 6,
         transform: "uppercase",
@@ -426,12 +448,16 @@ serve(async (req) => {
 
       const { data, error } = await adminClient
         .from("borrowers")
-        .select("id, workspace_id, username, borrower_id, created_at")
+        .select(encryptedMode ? "id,workspace_id,encrypted_data,nonce,auth_tag,key_version,created_at" : "id, workspace_id, username, borrower_id, created_at")
         .eq("id", id)
         .single();
 
       if (error || !data) {
         return jsonResponse(400, { error: "Unable to update borrower." });
+      }
+      if (encryptedMode) {
+        const [borrower] = await decryptSuperBorrowers([data as unknown as Parameters<typeof decryptSuperBorrowers>[0][number]], Deno.env.get("ITX_SGW_INTERNAL_SECRET") ?? "");
+        return jsonResponse(200, { data: { ...borrower, created_at: (data as unknown as { created_at: string }).created_at } });
       }
       return jsonResponse(200, { data });
     }
@@ -459,6 +485,13 @@ serve(async (req) => {
       );
       if (!verified) {
         return jsonResponse(403, { error: "Super password verification failed." });
+      }
+
+      if (encryptedMode) {
+        const { data, error } = await adminClient.rpc("super_delete_encrypted_borrower", { p_id: id, p_actor_id: user.id });
+        if (error) return jsonResponse(503, { error: "Unable to delete borrower." });
+        if (!data) return jsonResponse(404, { error: "Borrower not found." });
+        return jsonResponse(200, { data: { success: true } });
       }
 
       const { data: target, error: targetError } = await adminClient

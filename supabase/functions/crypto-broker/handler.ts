@@ -57,10 +57,12 @@ export function createBrokerHandler(overrides: Partial<Dependencies> = {}) {
     const { data: session, error: authError } = await deps.getExternalAuthUser(user, auth);
     if (authError || !session.user) return reply(401, { error: 'Unauthorized' });
     const { data: profile, error: profileError } = await user.from('profiles').select('workspace_id,role,is_active').eq('id', session.user.id).single();
-    if (profileError || !profile?.workspace_id || profile.is_active === false || !['workspace_admin', 'individual_account'].includes(profile.role)) return reply(403, { error: 'Access denied' });
+    if (profileError || !profile?.workspace_id || profile.is_active === false || !['workspace_admin', 'individual_account', 'tenant_account'].includes(profile.role)) return reply(403, { error: 'Access denied' });
     const { data: workspace, error: workspaceError } = await user.from('workspaces').select('status').eq('id', profile.workspace_id).single();
     if (!resolveWorkspaceAccess(workspace, workspaceError).allowed) return reply(403, { error: 'Access denied' });
     const body = asRecord(await readJsonBody(req, 48 * 1024));
+    const tenantDirectory = profile.role === 'tenant_account';
+    if (tenantDirectory && (body.action !== 'list' || body.archived === true)) return reply(403, { error: 'Access denied' });
     const deviceId = optionalText(body.device_id, { maxLen: 128 });
     const device = await deps.validateAccountDeviceSession(admin, { workspaceId: profile.workspace_id, profileId: session.user.id, deviceId, authToken: token });
     if (device.relationMissing) return reply(503, { error: 'Service unavailable' });
@@ -102,7 +104,9 @@ export function createBrokerHandler(overrides: Partial<Dependencies> = {}) {
     }
     if (body.action === 'restore') {
       const id = requireUuid(body.id);
-      const { data: row, error: loadError } = await admin.from('borrowers').select('id,access_mode,encrypted_data,nonce,auth_tag,key_version').eq('workspace_id', workspaceId).eq('id', id).not('deleted_at', 'is', null).maybeSingle();
+      let restoreQuery = admin.from('borrowers').select('id,access_mode,encrypted_data,nonce,auth_tag,key_version').eq('workspace_id', workspaceId).eq('id', id).not('deleted_at', 'is', null);
+      if (profile.role === 'individual_account') restoreQuery = restoreQuery.eq('access_mode', 'all');
+      const { data: row, error: loadError } = await restoreQuery.maybeSingle();
       if (loadError || !row || !row.encrypted_data || !row.nonce || !row.auth_tag || row.key_version !== 1) return reply(404, { error: 'Borrower unavailable' });
       const result = await deps.callGateway('decrypt', { workspace_id: workspaceId, items: [{ id: row.id, ciphertext: row.encrypted_data, nonce: row.nonce, auth_tag: row.auth_tag }] }, gatewaySecret);
       if (!Array.isArray(result.items) || result.items.length !== 1 || result.items[0]?.id !== row.id) throw new Error('Gateway unavailable');
@@ -121,7 +125,11 @@ export function createBrokerHandler(overrides: Partial<Dependencies> = {}) {
       if (!Number.isSafeInteger(page) || !Number.isSafeInteger(size) || (page as number) < 0 || (size as number) < 1 || (size as number) > 50 || (page as number) * (size as number) > 100000) throw new ValidationError();
       const offset = (page as number) * (size as number);
       if (body.archived !== undefined && typeof body.archived !== 'boolean') throw new ValidationError();
-      let query = admin.from('borrowers').select('id,access_mode,encrypted_data,nonce,auth_tag,key_version').eq('workspace_id', workspaceId);
+      // Tenant rows must be selected with the caller's JWT so Postgres RLS
+      // applies workspace, active-session, and restricted-borrower grants.
+      const individual = profile.role === 'individual_account';
+      let query = (tenantDirectory || (individual && body.archived !== true) ? user : admin).from('borrowers').select('id,access_mode,encrypted_data,nonce,auth_tag,key_version').eq('workspace_id', workspaceId);
+      if (individual && body.archived === true) query = query.eq('access_mode', 'all');
       query = body.archived === true ? query.not('deleted_at', 'is', null) : query.is('deleted_at', null);
       const { data: rows, error } = await query.order('created_at', { ascending: false }).order('id', { ascending: false }).range(offset, offset + (size as number));
       if (error || !rows) return reply(503, { error: 'Service unavailable' });
@@ -142,15 +150,47 @@ export function createBrokerHandler(overrides: Partial<Dependencies> = {}) {
         const legacyName = typeof payload.username === 'string' ? payload.username.trim() : '';
         const name = firstName ? [firstName, lastName].filter(Boolean).join(' ') : legacyName;
         if (!name) throw new Error('Gateway unavailable');
+        if (tenantDirectory) return { id: row.id, workspace_id: workspaceId, username: name, borrower_id: payload.borrower_id };
         return { id: row.id, workspace_id: workspaceId, access_mode: row.access_mode, username: name, borrower_id: payload.borrower_id, first_name: firstName || null, last_name: lastName || null, display_name: name, email: typeof payload.email === 'string' ? payload.email : null };
       });
       return reply(200, { data: { rows: decrypted, hasMore } });
+    }
+    if (body.action === 'decrypt-log-borrowers') {
+      if (!Array.isArray(body.ids) || body.ids.length < 1 || body.ids.length > 100) throw new ValidationError();
+      const ids = body.ids.map(requireUuid);
+      if (new Set(ids.map((id: string) => id.toLowerCase())).size !== ids.length) throw new ValidationError();
+      // Check the actual history rows through caller RLS before using the
+      // privileged client to read associated active or archived ciphertext.
+      const { data: logs, error: logError } = await user.from('item_logs').select('id,checked_out_by').eq('workspace_id', workspaceId).in('id', ids);
+      if (logError || !logs || logs.length !== ids.length) return reply(404, { error: 'History unavailable' });
+      const borrowerIds = [...new Set(logs.flatMap((log: any) => log.checked_out_by ? [log.checked_out_by] : []))];
+      const byBorrower = new Map<string, { username: string; borrower_id: string }>();
+      if (borrowerIds.length) {
+        const borrowerClient = profile.role === 'individual_account' ? user : admin;
+        const { data: rows, error } = await borrowerClient.from('borrowers').select('id,access_mode,deleted_at,encrypted_data,nonce,auth_tag,key_version').eq('workspace_id', workspaceId).in('id', borrowerIds);
+        if (error || !rows || rows.length !== borrowerIds.length || rows.some((row: any) => !row.encrypted_data || !row.nonce || !row.auth_tag || row.key_version !== 1)) return reply(503, { error: 'History unavailable' });
+        if (profile.role === 'individual_account' && rows.some((row: any) => row.access_mode !== 'all' || row.deleted_at !== null)) return reply(404, { error: 'History unavailable' });
+        const result = await deps.callGateway('decrypt', { workspace_id: workspaceId, items: rows.map((row: any) => ({ id: row.id, ciphertext: row.encrypted_data, nonce: row.nonce, auth_tag: row.auth_tag })) }, gatewaySecret);
+        if (!Array.isArray(result.items) || result.items.length !== rows.length) throw new Error('Gateway unavailable');
+        const expected = new Set(rows.map((row: any) => row.id));
+        for (const item of result.items) {
+          if (!expected.has(item?.id) || byBorrower.has(item.id)) throw new Error('Gateway unavailable');
+          const payload = item.payload;
+          const first = typeof payload?.first_name === 'string' ? payload.first_name.trim() : '';
+          const last = typeof payload?.last_name === 'string' ? payload.last_name.trim() : '';
+          const username = first ? [first, last].filter(Boolean).join(' ') : typeof payload?.username === 'string' ? payload.username.trim() : '';
+          if (!username || typeof payload?.borrower_id !== 'string' || !payload.borrower_id.trim()) throw new Error('Gateway unavailable');
+          byBorrower.set(item.id, { username, borrower_id: payload.borrower_id });
+        }
+      }
+      return reply(200, { data: logs.map((log: any) => ({ id: log.id, borrower: log.checked_out_by ? byBorrower.get(log.checked_out_by) : null })) });
     }
     if (body.action === 'decrypt') {
       if (!Array.isArray(body.ids) || body.ids.length < 1 || body.ids.length > 100) throw new ValidationError();
       const ids = body.ids.map(requireUuid);
       if (new Set(ids.map((id: string) => id.toLowerCase())).size !== ids.length) throw new ValidationError();
-      const { data: rows, error } = await admin.from('borrowers').select('id,encrypted_data,nonce,auth_tag,key_version').eq('workspace_id', workspaceId).is('deleted_at', null).in('id', ids);
+      const borrowerClient = profile.role === 'individual_account' ? user : admin;
+      const { data: rows, error } = await borrowerClient.from('borrowers').select('id,encrypted_data,nonce,auth_tag,key_version').eq('workspace_id', workspaceId).is('deleted_at', null).in('id', ids);
       if (error || !rows || rows.length !== ids.length || rows.some((row: any) => !row.encrypted_data || !row.nonce || !row.auth_tag || row.key_version !== 1)) return reply(404, { error: 'Borrower unavailable' });
       const items = rows.map((row: any) => ({ id: row.id, ciphertext: row.encrypted_data, nonce: row.nonce, auth_tag: row.auth_tag }));
       const result = await deps.callGateway('decrypt', { workspace_id: workspaceId, items }, gatewaySecret);

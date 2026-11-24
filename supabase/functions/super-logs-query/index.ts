@@ -9,6 +9,7 @@ import { isSuperAdminTokenBlockedBySessionRevocation } from "../_shared/superAdm
 import { resolveCorsHeaders } from "../_shared/cors.ts";
 import { readJsonBody } from "../_shared/requestBody.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
+import { decryptSuperBorrowers } from "../_shared/superEncryptedBorrowers.ts";
 import {
   optionalInteger,
   optionalIsoDate,
@@ -215,6 +216,7 @@ serve(async (req) => {
     ) as string[];
     const workspaceIds = Array.from(new Set(rows.map((row) => row.workspace_id)));
 
+    const encryptedMode = Deno.env.get("ITX_ENCRYPTED_BORROWERS_LOCAL") === "true";
     const [itemResult, borrowerResult, tenantResult] = await Promise.all([
       itemIds.length
         ? adminClient.from("items").select("id, name, barcode").in("id", itemIds)
@@ -222,7 +224,7 @@ serve(async (req) => {
       borrowerIds.length
         ? adminClient
             .from("borrowers")
-            .select("id, username, borrower_id")
+            .select(encryptedMode ? "id,workspace_id,encrypted_data,nonce,auth_tag,key_version" : "id,workspace_id,username,borrower_id")
             .in("id", borrowerIds)
         : Promise.resolve({ data: [], error: null }),
       workspaceIds.length
@@ -235,15 +237,12 @@ serve(async (req) => {
         (item) => [item.id, item]
       )
     );
-    const borrowerById = new Map(
-      (
-        (borrowerResult.data ?? []) as Array<{
-          id: string;
-          username: string;
-          borrower_id: string;
-        }>
-      ).map((item) => [item.id, item])
-    );
+    if (borrowerResult.error) throw new Error("Borrower data unavailable");
+    const borrowerRows = borrowerResult.data ?? [];
+    const borrowers = encryptedMode
+      ? await decryptSuperBorrowers(borrowerRows as unknown as Parameters<typeof decryptSuperBorrowers>[0], Deno.env.get("ITX_SGW_INTERNAL_SECRET") ?? "")
+      : borrowerRows as unknown as Array<{ id: string; workspace_id: string; username: string; borrower_id: string }>;
+    const borrowerById = new Map(borrowers.map((item) => [item.id, item]));
     const tenantById = new Map(
       ((tenantResult.data ?? []) as Array<{ id: string; name: string }>).map((item) => [
         item.id,
@@ -255,7 +254,7 @@ serve(async (req) => {
       .map((row) => ({
         ...row,
         item: itemById.get(row.item_id) ?? null,
-        borrower: row.checked_out_by ? borrowerById.get(row.checked_out_by) ?? null : null,
+        borrower: row.checked_out_by && borrowerById.get(row.checked_out_by)?.workspace_id === row.workspace_id ? borrowerById.get(row.checked_out_by) ?? null : null,
         workspace: tenantById.get(row.workspace_id) ?? null,
       }))
       .filter((row) => {

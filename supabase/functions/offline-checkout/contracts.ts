@@ -20,6 +20,32 @@ const OFFLINE_RESOLUTIONS = new Set(
 type OfflineIntent = "checkout" | "return" | "quick_return";
 type OfflineResolution = "keep_server" | "apply_offline";
 
+// Database conflict snapshots must not retain decrypted borrower or actor data.
+export const sanitizeStoredItemResults = (value: unknown) => {
+  if (!Array.isArray(value)) return [];
+  return value.map((entry) => {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+      return { status: "needs_review" };
+    }
+    const source = entry as Record<string, unknown>;
+    const safe: Record<string, unknown> = {};
+    for (const key of ["item_id", "barcode", "status", "reason"]) {
+      if (typeof source[key] === "string") safe[key] = source[key];
+    }
+    if (source.server_state && typeof source.server_state === "object" && !Array.isArray(source.server_state)) {
+      const state = source.server_state as Record<string, unknown>;
+      safe.server_state = {
+        ...(typeof state.id === "string" ? { id: state.id } : {}),
+        ...(typeof state.name === "string" ? { name: state.name } : {}),
+        ...(typeof state.barcode === "string" ? { barcode: state.barcode } : {}),
+        ...(typeof state.status === "string" ? { status: state.status } : {}),
+        checked_out_by: null,
+      };
+    }
+    return safe;
+  });
+};
+
 export type OfflineSyncItem = {
   item_id: string;
   barcode: string;

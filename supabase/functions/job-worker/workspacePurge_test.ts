@@ -22,6 +22,7 @@ const makeDeps = (overrides: Partial<WorkspacePurgeDeps> = {}) => {
       calls.push(`claim:${limit}`);
       return Promise.resolve([workspace("w1")]);
     },
+    ensureKeyRevoked: () => Promise.resolve(),
     listProfiles: () => Promise.resolve([{ id: "p1", better_auth_user_id: "u1" }]),
     deleteBetterAuthUser: (profileId) => {
       calls.push(`user:${profileId}`);
@@ -62,6 +63,14 @@ Deno.test("purges external systems before the database transaction", async () =>
     "files:1",
     'purge:w1:{"better_auth_users":1,"support_attachment_files":1,"organization_logo":1}',
   ]);
+});
+
+Deno.test("does not delete workspace data when the key has not been revoked", async () => {
+  const { deps, calls } = makeDeps({
+    ensureKeyRevoked: () => Promise.reject(new Error("key not revoked")),
+  });
+  assertEquals(await purgeExpiredWorkspaces(deps), { claimed: 1, purged: 0, failed: 1 });
+  assertEquals(calls, ["claim:3", "release:w1"]);
 });
 
 Deno.test("does nothing when no workspace is due", async () => {

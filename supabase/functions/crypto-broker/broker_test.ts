@@ -45,3 +45,10 @@ Deno.test('local gateway override accepts only loopback and never changes produc
     await assertRejects(async () => resolveGatewayOrigin(invalid), Error, 'Gateway unavailable');
   }
 });
+
+Deno.test('gateway selects the isolated staging endpoint only for the staging project', async () => {
+  const { resolveGatewayOrigin } = await import('./gateway.ts');
+  assertEquals(resolveGatewayOrigin(undefined, 'https://nwuhjxicaopkmqydjlas.supabase.co'), 'https://itemtraxx-sgw-staging.itemtraxx-co.workers.dev');
+  assertEquals(resolveGatewayOrigin(undefined, 'https://mlaspkufocikfcbjgpof.supabase.co'), 'https://sgw.itemtraxx.com');
+  await assertRejects(async () => resolveGatewayOrigin(undefined, 'https://unknown.supabase.co'), Error, 'Gateway unavailable');
+});

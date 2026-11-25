@@ -1,5 +1,9 @@
-export function resolveLifecycleOrigin(localOrigin: string | undefined): string {
-  if (!localOrigin) return "https://sgw.itemtraxx.com";
+export function resolveLifecycleOrigin(localOrigin: string | undefined, projectUrl?: string): string {
+  if (!localOrigin) {
+    if (!projectUrl || projectUrl === "https://mlaspkufocikfcbjgpof.supabase.co") return "https://sgw.itemtraxx.com";
+    if (projectUrl === "https://nwuhjxicaopkmqydjlas.supabase.co") return "https://itemtraxx-sgw-staging.itemtraxx-co.workers.dev";
+    throw new Error("Workspace key provisioning unavailable");
+  }
   try {
     const url = new URL(localOrigin);
     if (url.protocol !== "http:" || url.hostname !== "127.0.0.1" || !url.port || url.username || url.password || url.href !== `${url.origin}/`) throw new Error();
@@ -14,7 +18,7 @@ async function lifecycle(operation: "generate-tenant-keys" | "revoke-tenant-keys
     throw new Error("Workspace key provisioning unavailable");
   }
   try {
-    const origin = resolveLifecycleOrigin(Deno.env.get("ITX_SGW_LOCAL_ORIGIN"));
+    const origin = resolveLifecycleOrigin(Deno.env.get("ITX_SGW_LOCAL_ORIGIN"), Deno.env.get("SUPABASE_URL"));
     const response = await fetcher(`${origin}/v1/kms/${operation}`, {
       method: "POST",
       headers: { authorization: `Bearer ${secret}`, "content-type": "application/json" },

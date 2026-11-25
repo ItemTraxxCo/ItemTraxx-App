@@ -5,7 +5,7 @@ const workspace = 'd8b57c2b-c473-451e-9d0b-a0989ac8a8a4';
 const otherWorkspace = 'fe2c2477-e6aa-462b-ab3c-502ba53bcba3';
 const id = 'e535bd49-df6a-4c94-8e77-f9497ab83e43';
 
-function setup(options: { role?: string; valid?: boolean; missing?: boolean; rowWorkspace?: string; gatewayFailure?: boolean; nameOnly?: boolean; borrowerAccessMode?: string; borrowerDeleted?: boolean; modeUnavailable?: boolean; realGateway?: (op: string, body: Record<string, unknown>) => Promise<Record<string, unknown>> } = {}) {
+function setup(options: { role?: string; valid?: boolean; missing?: boolean; rowWorkspace?: string; gatewayFailure?: boolean; nameOnly?: boolean; borrowerAccessMode?: string; borrowerDeleted?: boolean; modeUnavailable?: boolean; legacyMode?: boolean; realGateway?: (op: string, body: Record<string, unknown>) => Promise<Record<string, unknown>> } = {}) {
   let gatewayCalls = 0;
   const rateScopes: string[] = [];
   let createArgs: Record<string, unknown> | undefined;
@@ -33,7 +33,7 @@ function setup(options: { role?: string; valid?: boolean; missing?: boolean; row
     };
   };
   let clientCount = 0;
-  const client = (kind: string) => ({ from: (table: string) => { if (table === 'borrowers') borrowerReaders.push(kind); return query(table); }, rpc: (name: string, args: Record<string, unknown>) => { if (name === 'consume_rate_limit') rateScopes.push(String(args.p_scope)); if (name === 'borrower_workspace_encryption_enabled') { assertEquals(args.p_workspace_id, workspace); return Promise.resolve({ data: options.modeUnavailable ? null : true, error: null }); } if (name === 'restore_encrypted_borrower') { restoreCalls++; return Promise.resolve({ data: true, error: null }); } if (name === 'create_encrypted_borrower') { createArgs = args; return Promise.resolve({ data: args.p_id, error: null }); } return Promise.resolve({ data: [{ allowed: true, retry_after_seconds: null }], error: null }); } });
+  const client = (kind: string) => ({ from: (table: string) => { if (table === 'borrowers') borrowerReaders.push(kind); return query(table); }, rpc: (name: string, args: Record<string, unknown>) => { if (name === 'consume_rate_limit') rateScopes.push(String(args.p_scope)); if (name === 'borrower_workspace_encryption_enabled') { assertEquals(args.p_workspace_id, workspace); return Promise.resolve({ data: options.modeUnavailable ? null : !options.legacyMode, error: null }); } if (name === 'restore_encrypted_borrower') { restoreCalls++; return Promise.resolve({ data: true, error: null }); } if (name === 'create_encrypted_borrower') { createArgs = args; return Promise.resolve({ data: args.p_id, error: null }); } return Promise.resolve({ data: [{ allowed: true, retry_after_seconds: null }], error: null }); } });
   const handler = createBrokerHandler({
     createClient: () => client(++clientCount % 2 ? 'user' : 'admin') as never,
     getExternalAuthUser: async () => ({ data: { user: { id } }, error: null }) as never,
@@ -62,6 +62,16 @@ Deno.test('workspace mode is session scoped and fails closed when unavailable', 
   assertEquals(tenant.getGatewayCalls(), 0);
   assertEquals((await setup({ modeUnavailable: true }).run({ action: 'mode' })).status, 503);
   assertEquals((await setup({ valid: false }).run({ action: 'mode' })).status, 401);
+});
+
+Deno.test('encrypted creation fails closed before workspace cutover', async () => {
+  const payload = { first_name: 'Synthetic', last_name: null, borrower_id: 'ABC123', email: null, access_mode: 'all', profile_ids: [] };
+  for (const options of [{ legacyMode: true }, { modeUnavailable: true }]) {
+    const t = setup(options);
+    assertEquals((await t.run({ action: 'create', payload })).status, 503);
+    assertEquals(t.getGatewayCalls(), 0);
+    assertEquals(t.getCreateArgs(), undefined);
+  }
 });
 Deno.test('directory pages use bounded read buckets while writes use the admin bucket', async () => {
   const t = setup();

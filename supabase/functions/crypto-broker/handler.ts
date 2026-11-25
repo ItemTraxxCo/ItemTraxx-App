@@ -79,6 +79,8 @@ export function createBrokerHandler(overrides: Partial<Dependencies> = {}) {
       return reply(200, { data: { encrypted: enabled } });
     }
     if (body.action === 'create') {
+      const enabled = await borrowerEncryptionEnabled(admin, workspaceId, deps.getEnv('ITX_ENCRYPTED_BORROWERS_LOCAL') === 'true');
+      if (!enabled) return reply(503, { error: 'Borrower encryption is not ready for this workspace' });
       const input = asRecord(body.payload);
       const firstName = requireText(input.first_name, { maxLen: 100 });
       const lastName = optionalText(input.last_name, { maxLen: 100 });

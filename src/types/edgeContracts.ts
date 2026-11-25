@@ -11,7 +11,7 @@ export type TenantFeatureFlags = {
 };
 
 export type SuperItemAction = "list" | "create" | "update" | "delete";
-export type SuperBorrowerAction = "list" | "create" | "update" | "delete";
+export type SuperBorrowerAction = "list" | "create" | "update" | "delete" | "workspace_mode";
 
 export type AdminOpsAction =
   | "get_notifications"

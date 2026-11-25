@@ -17,6 +17,7 @@ import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 import { logError, withRequestSpan } from "../_shared/observability.ts";
 import { sha256Hex } from "../_shared/sha256.ts";
 import { hashBorrowerId } from "../_shared/encryptedBorrower.ts";
+import { borrowerEncryptionEnabled } from "../_shared/borrowerEncryptionMode.ts";
 import { buildQuickReturnAuditRecord } from "./adminAudit.ts";
 
 const baseCorsHeaders = {
@@ -236,7 +237,7 @@ serve((req) => withRequestSpan(req, "POST /functions/checkoutReturn", async (spa
     if (!isAdminReturn && !isQuickReturn) {
       const borrowerId = requireText(borrower_id, { maxLen: 32 });
 
-      const encryptedMode = Deno.env.get("ITX_ENCRYPTED_BORROWERS_LOCAL") === "true";
+      const encryptedMode = await borrowerEncryptionEnabled(adminClient, callerProfile.workspace_id, Deno.env.get("ITX_ENCRYPTED_BORROWERS_LOCAL") === "true");
       const lookupValue = encryptedMode
         ? await hashBorrowerId(callerProfile.workspace_id, borrowerId, Deno.env.get("ITX_SGW_INTERNAL_SECRET") ?? "")
         : borrowerId;

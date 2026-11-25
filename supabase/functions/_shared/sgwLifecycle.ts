@@ -34,8 +34,9 @@ export const provisionWorkspaceKey = (workspaceId: string, secret: string, fetch
 export const revokeWorkspaceKey = (workspaceId: string, secret: string, fetcher: typeof fetch = fetch) =>
   lifecycle("revoke-tenant-keys", "revoked", workspaceId, secret, fetcher);
 
-export async function provisionAndActivateWorkspace(provision: () => Promise<void>, activate: () => Promise<void>): Promise<void> {
+export async function provisionAndActivateWorkspace(provision: () => Promise<void>, initialize: () => Promise<void>, activate: () => Promise<void>): Promise<void> {
   await provision();
+  await initialize();
   await activate();
 }
 

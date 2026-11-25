@@ -43,7 +43,7 @@ const page = ref(0);
 const hasMore = ref(false);
 const loading = ref(true);
 const error = ref("");
-const encryptedMode = isEncryptedBorrowerDirectoryEnabled();
+const encryptedMode = ref<boolean | null>(null);
 const search = ref("");
 const decryptedRows = ref<Row[] | null>(null);
 const auth = getAuthState();
@@ -61,8 +61,11 @@ const load = async (requestedPage = page.value) => {
   error.value = "";
   const version = ++requestVersion;
   try {
+    const mode = encryptedMode.value ?? await isEncryptedBorrowerDirectoryEnabled();
+    if (version !== requestVersion) return;
+    encryptedMode.value = mode;
     let result: { rows: Row[]; hasMore: boolean };
-    if (encryptedMode) {
+    if (encryptedMode.value) {
       const rows = decryptedRows.value ?? await fetchSortedBorrowers();
       if (version !== requestVersion) return;
       decryptedRows.value = rows;
@@ -104,6 +107,7 @@ watch(search, () => {
 watch(() => [auth.userId, auth.workspaceContextId, auth.isAuthenticated], () => {
   requestVersion++;
   decryptedRows.value = null;
+  encryptedMode.value = null;
   borrowers.value = [];
   search.value = "";
   hasMore.value = false;

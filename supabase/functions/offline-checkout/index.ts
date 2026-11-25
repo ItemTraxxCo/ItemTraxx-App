@@ -9,6 +9,7 @@ import { readJsonBody } from "../_shared/requestBody.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 import { requireEnum, requireUuid, ValidationError } from "../_shared/validation.ts";
 import { decryptBorrowers } from "../_shared/encryptedBorrower.ts";
+import { borrowerEncryptionEnabled } from "../_shared/borrowerEncryptionMode.ts";
 import {
   containsQuickReturn,
   type OfflineSyncItem,
@@ -154,7 +155,6 @@ serve(async (req) => {
       return jsonResponse(403, { error: "Access denied" });
     }
     const profile = profileRow as Profile;
-    const encryptedMode = Deno.env.get("ITX_ENCRYPTED_BORROWERS_LOCAL") === "true";
     const gatewaySecret = Deno.env.get("ITX_SGW_INTERNAL_SECRET") ?? "";
 
     const body = await readJsonBody(req, 256 * 1024);
@@ -163,6 +163,7 @@ serve(async (req) => {
     const adminClient = createClient(supabaseUrl, serviceKey, {
       auth: { persistSession: false },
     });
+    const encryptedMode = await borrowerEncryptionEnabled(adminClient, profile.workspace_id, Deno.env.get("ITX_ENCRYPTED_BORROWERS_LOCAL") === "true");
     const session = await validateAccountDeviceSession(adminClient, {
       workspaceId: profile.workspace_id,
       profileId: profile.id,

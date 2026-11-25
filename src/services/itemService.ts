@@ -218,7 +218,7 @@ export const restoreItem = async (id: string) => {
 
 export const fetchItemLogs = async () => {
   const workspaceId = getWorkspaceContextId();
-  const encryptedMode = isEncryptedBorrowerDirectoryEnabled();
+  const encryptedMode = await isEncryptedBorrowerDirectoryEnabled();
   const rows = ((await authenticatedSelect<Array<{
     id: string;
     workspace_id: string;

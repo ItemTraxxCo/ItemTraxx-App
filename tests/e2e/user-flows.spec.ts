@@ -233,6 +233,7 @@ test.describe("core user flows", () => {
     await page.route(/\/functions(?:\/v1)?\/admin-borrower-mutate(?:\?.*)?$/, async (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ data: [] }) }));
     await page.route(/\/functions(?:\/v1)?\/crypto-broker(?:\?.*)?$/, async (route) => {
       const body = route.request().postDataJSON() as { action: string; payload: Record<string, unknown> };
+      if (body.action === "mode") return await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ data: { encrypted: false } }) });
       createRequests.push(body.payload);
       await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ data: { id: `borrower-${createRequests.length}`, workspace_id: "tenant-e2e", username: [body.payload.first_name, body.payload.last_name].filter(Boolean).join(" "), ...body.payload } }) });
     });

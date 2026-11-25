@@ -187,7 +187,7 @@ const loadBorrowers = async () => {
   try {
     const rows = await listSuperBorrowers(workspaceFilter.value, search.value.trim());
     if (version !== sessionVersion) return;
-    borrowers.value = rows;
+    borrowers.value = [...rows].sort((a, b) => a.username.localeCompare(b.username, undefined, { sensitivity: 'base', numeric: true }));
   } catch (err) {
     if (version !== sessionVersion) return;
     if (isUnauthorizedError(err)) {

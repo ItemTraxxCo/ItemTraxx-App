@@ -30,7 +30,7 @@ describe('encrypted tenant borrower directory', () => {
     getAuthState().isAuthenticated = false;
     await flushPromises();
     expect(wrapper.text()).not.toContain('Name 20');
-    expect((wrapper.get('input[type="search"]').element as HTMLInputElement).value).toBe('');
+    expect(wrapper.find('input[type="search"]').exists()).toBe(false);
     wrapper.unmount();
   });
   it('discards an in-flight decrypted response when the session changes', async () => {

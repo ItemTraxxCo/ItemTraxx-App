@@ -48,6 +48,14 @@ export const mockSystemStatus = async (page: Page) => {
   });
 };
 
+export const mockBorrowerEncryptionMode = async (page: Page, encrypted = false) => {
+  await page.route(/\/functions(?:\/v1)?\/crypto-broker(?:\?.*)?$/, async (route) => {
+    const body = route.request().postDataJSON() as { action?: string };
+    if (body.action !== 'mode') return await route.fallback();
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { encrypted } }) });
+  });
+};
+
 export const mockUnauthenticatedSession = async (
   target: Page | BrowserContext,
   options: { delayMs?: number } = {}

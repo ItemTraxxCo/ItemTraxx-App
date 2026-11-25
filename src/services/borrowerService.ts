@@ -3,6 +3,8 @@ import { authenticatedSelect, authenticatedSelectPage } from "./authenticatedDat
 import { getAuthState } from "../store/authState";
 import { edgeFunctionError, missingContextError } from "./appErrors";
 import { getOrCreateDeviceSession } from "../utils/deviceSession";
+import { isEncryptedBorrowerDirectoryEnabled } from "./borrowerEncryptionMode";
+export { isEncryptedBorrowerDirectoryEnabled } from "./borrowerEncryptionMode";
 
 export type BorrowerItem = {
   id: string;
@@ -24,8 +26,6 @@ export type BorrowerDetails = {
 
 type MaybeRelation<T> = T | T[] | null;
 const ADMIN_LIST_PAGE_SIZE = 500;
-const encryptedDirectoryPreview = () => import.meta.env.DEV && import.meta.env.VITE_ENCRYPTED_BORROWERS_LOCAL === "true";
-export const isEncryptedBorrowerDirectoryEnabled = encryptedDirectoryPreview;
 const ACCESS_GRANT_BATCH_SIZE = 100;
 
 const pickRelation = <T>(value: MaybeRelation<T>): T | null => {
@@ -48,10 +48,11 @@ export const fetchBorrowers = async () => {
   // compatibility contract while bounding every individual PostgREST request;
   // interactive pages should use fetchBorrowerPage instead.
   const rows: BorrowerItem[] = [];
+  const encryptedMode = await isEncryptedBorrowerDirectoryEnabled();
   let page = 0;
   while (true) {
-    const result = await fetchBorrowerPage(page, encryptedDirectoryPreview() ? 50 : ADMIN_LIST_PAGE_SIZE);
-    if (encryptedDirectoryPreview() && rows.length + result.rows.length > 10000) throw new Error("Encrypted borrower directory exceeds the local preview limit.");
+    const result = await fetchBorrowerPage(page, encryptedMode ? 50 : ADMIN_LIST_PAGE_SIZE, "created_at.desc", encryptedMode);
+    if (encryptedMode && rows.length + result.rows.length > 10000) throw new Error("Encrypted borrower directory exceeds the supported limit.");
     rows.push(...result.rows);
     if (!result.hasMore) return rows;
     page += 1;
@@ -67,9 +68,10 @@ export const fetchBorrowerPage = async (
   page = 0,
   pageSize = 20,
   order = "created_at.desc",
+  resolvedMode?: boolean,
 ) => {
   const workspaceId = getWorkspaceContextId();
-  if (encryptedDirectoryPreview()) {
+  if (resolvedMode ?? await isEncryptedBorrowerDirectoryEnabled()) {
     if (pageSize > 50) throw new Error("Encrypted borrower pages are limited to 50 records.");
     const { deviceId } = getOrCreateDeviceSession();
     const response = await invokeEdgeFunction<{ data: { rows: BorrowerItem[]; hasMore: boolean } }>("crypto-broker", {
@@ -103,7 +105,7 @@ export const fetchBorrowerAccessGrants = async (borrowerIds: string[]) => {
 
 export const fetchDeletedBorrowers = async () => {
   const { deviceId } = getOrCreateDeviceSession();
-  if (encryptedDirectoryPreview()) {
+  if (await isEncryptedBorrowerDirectoryEnabled()) {
     const rows: BorrowerItem[] = [];
     for (let page = 0; ; page++) {
       const response = await invokeEdgeFunction<{ data: { rows: BorrowerItem[]; hasMore: boolean } }>("crypto-broker", {
@@ -255,7 +257,7 @@ export const deleteBorrower = async (id: string) => {
 
 export const restoreBorrower = async (id: string) => {
   const { deviceId } = getOrCreateDeviceSession();
-  if (encryptedDirectoryPreview()) {
+  if (await isEncryptedBorrowerDirectoryEnabled()) {
     const response = await invokeEdgeFunction<{ data: BorrowerItem }>("crypto-broker", {
       method: "POST", body: { action: "restore", id, device_id: deviceId },
     });

@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import {
   mockAdminOps,
+  mockBorrowerEncryptionMode,
   mockSuperWorkspaceMutate,
   mockSystemStatus,
   mockUnauthenticatedSession,
@@ -37,6 +38,7 @@ test.describe("workspace model role surfaces", () => {
     await mockSystemStatus(page);
     await mockUnauthenticatedSession(page);
     await mockAdminOps(page);
+    await mockBorrowerEncryptionMode(page);
     await page.route("**/rest/v1/**", async (route) => {
       const url = new URL(route.request().url());
       const table = url.pathname.split("/").at(-1);

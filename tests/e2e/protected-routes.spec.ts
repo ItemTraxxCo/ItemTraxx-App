@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import {
   mockAdminOps,
+  mockBorrowerEncryptionMode,
   navigateApp,
   mockSuperDashboard,
   mockSystemStatus,
@@ -16,6 +17,7 @@ test.describe("Protected route smoke tests", () => {
     await mockSystemStatus(page);
     await mockUnauthenticatedSession(page);
     await mockAdminOps(page);
+    await mockBorrowerEncryptionMode(page);
     await mockSuperDashboard(page);
   });
 

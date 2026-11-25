@@ -13,7 +13,8 @@ import { writeSuperAdminAudit } from "../_shared/superAdminAudit.ts";
 import { resolveCorsHeaders } from "../_shared/cors.ts";
 import { readJsonBody } from "../_shared/requestBody.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
-import { decryptSuperBorrowers } from "../_shared/superEncryptedBorrowers.ts";
+import { resolveMixedSuperBorrowers } from "../_shared/superEncryptedBorrowers.ts";
+import { borrowerEncryptionEnabled, borrowerEncryptionModes } from "../_shared/borrowerEncryptionMode.ts";
 import { callGateway } from "../crypto-broker/gateway.ts";
 import {
   optionalText,
@@ -60,7 +61,7 @@ type SuperBorrowerDatabase = {
       };
     };
     Views: Record<string, never>;
-    Functions: { super_create_encrypted_borrower: { Args: { p_id: string; p_workspace_id: string; p_actor_id: string; p_encrypted_data: string; p_nonce: string; p_auth_tag: string; p_borrower_id_hash: string; p_borrower_email_hash: string | null }; Returns: string }; super_delete_encrypted_borrower: { Args: { p_id: string; p_actor_id: string }; Returns: boolean } };
+    Functions: { borrower_workspace_encryption_enabled: { Args: { p_workspace_id: string }; Returns: boolean }; borrower_workspace_encryption_modes: { Args: { p_workspace_ids: string[] }; Returns: Array<{ workspace_id: string; encrypted_only: boolean }> }; super_create_encrypted_borrower: { Args: { p_id: string; p_workspace_id: string; p_actor_id: string; p_encrypted_data: string; p_nonce: string; p_auth_tag: string; p_borrower_id_hash: string; p_borrower_email_hash: string | null }; Returns: string }; super_delete_encrypted_borrower: { Args: { p_id: string; p_actor_id: string }; Returns: boolean } };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
   };
@@ -313,8 +314,13 @@ serve(async (req) => {
       return jsonResponse(400, { error: "Invalid request" });
     }
     const payloadRecord = payload as Record<string, unknown>;
-    const encryptedMode = Deno.env.get("ITX_ENCRYPTED_BORROWERS_LOCAL") === "true";
+    const localPreview = Deno.env.get("ITX_ENCRYPTED_BORROWERS_LOCAL") === "true";
     // The legacy update action is a read-only detail lookup.
+
+    if (action === "workspace_mode") {
+      const workspaceId = requireUuid(payloadRecord.workspace_id);
+      return jsonResponse(200, { data: { encrypted: await borrowerEncryptionEnabled(adminClient, workspaceId, localPreview) } });
+    }
 
     if (action === "list") {
       const workspaceId = optionalText(payloadRecord.workspace_id, { maxLen: 36 }) || "all";
@@ -325,7 +331,7 @@ serve(async (req) => {
 
       let query = adminClient
         .from("borrowers")
-        .select(encryptedMode ? "id,workspace_id,encrypted_data,nonce,auth_tag,key_version,created_at" : "id, workspace_id, username, borrower_id, created_at")
+        .select("id,workspace_id,username,borrower_id,encrypted_data,nonce,auth_tag,key_version,created_at")
         .order("created_at", { ascending: false })
         .limit(500);
 
@@ -343,9 +349,8 @@ serve(async (req) => {
         borrower_id: string;
         created_at: string;
       }>;
-      const rows = encryptedMode
-        ? (await decryptSuperBorrowers(sourceRows as unknown as Parameters<typeof decryptSuperBorrowers>[0], Deno.env.get("ITX_SGW_INTERNAL_SECRET") ?? "")).map((row, index) => ({ ...row, created_at: sourceRows[index].created_at }))
-        : sourceRows;
+      const modes = await borrowerEncryptionModes(adminClient, sourceRows.map(row => row.workspace_id), localPreview);
+      const rows = (await resolveMixedSuperBorrowers(sourceRows as unknown as Parameters<typeof resolveMixedSuperBorrowers>[0], modes, Deno.env.get("ITX_SGW_INTERNAL_SECRET") ?? "")).map((row, index) => ({ ...row, created_at: sourceRows[index].created_at }));
       if (!search) {
         return jsonResponse(200, { data: rows });
       }
@@ -361,6 +366,7 @@ serve(async (req) => {
 
     if (action === "create") {
       const workspaceId = requireUuid(payloadRecord.workspace_id);
+      const encryptedMode = await borrowerEncryptionEnabled(adminClient, workspaceId, localPreview);
       if (encryptedMode) {
         const firstName = requireText(payloadRecord.first_name, { maxLen: 100 });
         const lastName = optionalText(payloadRecord.last_name, { maxLen: 100 });
@@ -448,18 +454,17 @@ serve(async (req) => {
 
       const { data, error } = await adminClient
         .from("borrowers")
-        .select(encryptedMode ? "id,workspace_id,encrypted_data,nonce,auth_tag,key_version,created_at" : "id, workspace_id, username, borrower_id, created_at")
+        .select("id,workspace_id,username,borrower_id,encrypted_data,nonce,auth_tag,key_version,created_at")
         .eq("id", id)
         .single();
 
       if (error || !data) {
         return jsonResponse(400, { error: "Unable to update borrower." });
       }
-      if (encryptedMode) {
-        const [borrower] = await decryptSuperBorrowers([data as unknown as Parameters<typeof decryptSuperBorrowers>[0][number]], Deno.env.get("ITX_SGW_INTERNAL_SECRET") ?? "");
-        return jsonResponse(200, { data: { ...borrower, created_at: (data as unknown as { created_at: string }).created_at } });
-      }
-      return jsonResponse(200, { data });
+      const source = data as unknown as Parameters<typeof resolveMixedSuperBorrowers>[0][number] & { created_at: string };
+      const modes = await borrowerEncryptionModes(adminClient, [source.workspace_id], localPreview);
+      const [borrower] = await resolveMixedSuperBorrowers([source], modes, Deno.env.get("ITX_SGW_INTERNAL_SECRET") ?? "");
+      return jsonResponse(200, { data: { ...borrower, created_at: source.created_at } });
     }
 
     if (action === "delete") {
@@ -487,6 +492,9 @@ serve(async (req) => {
         return jsonResponse(403, { error: "Super password verification failed." });
       }
 
+      const { data: existing, error: existingError } = await adminClient.from("borrowers").select("id,workspace_id").eq("id", id).maybeSingle();
+      if (existingError || !existing) return jsonResponse(404, { error: "Borrower not found." });
+      const encryptedMode = await borrowerEncryptionEnabled(adminClient, existing.workspace_id, localPreview);
       if (encryptedMode) {
         const { data, error } = await adminClient.rpc("super_delete_encrypted_borrower", { p_id: id, p_actor_id: user.id });
         if (error) return jsonResponse(503, { error: "Unable to delete borrower." });

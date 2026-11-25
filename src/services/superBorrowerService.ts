@@ -37,6 +37,12 @@ export const listSuperBorrowers = async (workspaceId = "all", search = "") =>
     payload: { workspace_id: workspaceId, search },
   });
 
+export const getSuperBorrowerEncryptionMode = async (workspaceId: string) => {
+  const data = await callSuperBorrower<{ encrypted: boolean }>({ action: "workspace_mode", payload: { workspace_id: workspaceId } });
+  if (typeof data?.encrypted !== "boolean") throw new Error("Unable to determine borrower encryption status.");
+  return data.encrypted;
+};
+
 export const createSuperBorrower = async (payload: {
   workspace_id: string;
   username?: string;

@@ -7,12 +7,15 @@ const assert = (condition: boolean) => { if (!condition) throw new Error("assert
 
 Deno.test("workspace activation only occurs after provisioning succeeds", async () => {
   const events: string[] = [];
-  await provisionAndActivateWorkspace(async () => { events.push("provision"); }, async () => { events.push("activate"); });
-  assert(events.join(",") === "provision,activate");
+  await provisionAndActivateWorkspace(async () => { events.push("provision"); }, async () => { events.push("initialize"); }, async () => { events.push("activate"); });
+  assert(events.join(",") === "provision,initialize,activate");
   events.length = 0;
   let failed = false;
-  try { await provisionAndActivateWorkspace(async () => { events.push("provision"); throw new Error("down"); }, async () => { events.push("activate"); }); } catch { failed = true; }
+  try { await provisionAndActivateWorkspace(async () => { events.push("provision"); throw new Error("down"); }, async () => { events.push("initialize"); }, async () => { events.push("activate"); }); } catch { failed = true; }
   assert(failed && events.join(",") === "provision");
+  events.length = 0; failed = false;
+  try { await provisionAndActivateWorkspace(async () => { events.push("provision"); }, async () => { events.push("initialize"); throw new Error("down"); }, async () => { events.push("activate"); }); } catch { failed = true; }
+  assert(failed && events.join(",") === "provision,initialize");
 });
 
 Deno.test("lifecycle local override only permits an explicit loopback origin", () => {

@@ -265,7 +265,13 @@ serve(async (req) => {
     const encryptionReady = async (id: string) => {
       const { data, error } = await admin.from("sgw_workspace_key_lifecycle")
         .select("state").eq("workspace_id", id).maybeSingle();
-      return !error && data?.state === "active";
+      if (error || data?.state !== "active") return false;
+      const mode = await admin.rpc("borrower_workspace_encryption_enabled", { p_workspace_id: id });
+      return !mode.error && mode.data === true;
+    };
+    const initializeBorrowerEncryption = async (id: string) => {
+      const { data, error } = await admin.rpc("initialize_empty_workspace_borrower_encryption", { p_workspace_id: id });
+      if (error || data !== true) throw new Error("Workspace encryption initialization failed");
     };
     const individualLifecycleValues = (status: string) => {
       const now = new Date().toISOString();
@@ -426,7 +432,7 @@ serve(async (req) => {
       }
       if (provisionKeys) {
         try {
-          await provisionAndActivateWorkspace(() => provisionWorkspaceKey(w.id, lifecycleSecret), async () => {
+          await provisionAndActivateWorkspace(() => provisionWorkspaceKey(w.id, lifecycleSecret), () => initializeBorrowerEncryption(w.id), async () => {
             const { data, error } = await admin.from("workspaces").update({ status: "active" }).eq("id", w.id).eq("status", "suspended").is("archived_at", null).select("id").maybeSingle();
             if (error || !data) throw new Error("Workspace activation failed");
           });
@@ -648,7 +654,7 @@ serve(async (req) => {
       }
       if (provisionKeys) {
         try {
-          await provisionAndActivateWorkspace(() => provisionWorkspaceKey(w.id, lifecycleSecret), async () => {
+          await provisionAndActivateWorkspace(() => provisionWorkspaceKey(w.id, lifecycleSecret), () => initializeBorrowerEncryption(w.id), async () => {
             const { data, error } = await admin.from("workspaces").update({ status: "active" }).eq("id", w.id).eq("status", "suspended").is("archived_at", null).select("id").maybeSingle();
             if (error || !data) throw new Error("Workspace activation failed");
           });

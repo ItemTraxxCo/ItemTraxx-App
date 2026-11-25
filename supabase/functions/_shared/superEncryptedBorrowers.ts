@@ -20,3 +20,20 @@ export async function decryptSuperBorrowers(rows: Row[], secret: string, gateway
   }
   return rows.map(row => ({ id: row.id, workspace_id: row.workspace_id, ...decrypted.get(row.id)! }));
 }
+
+// The mode is authoritative per workspace: missing state or malformed data
+// fails the entire response, and encrypted records never fall back to columns.
+export async function resolveMixedSuperBorrowers(rows: Array<Row & { username: string | null; borrower_id: string | null }>, modes: Map<string, boolean>, secret: string, gateway: Gateway = callGateway) {
+  if (rows.length > 500 || rows.some(row => !modes.has(row.workspace_id))) throw new Error('Borrower data unavailable');
+  const encrypted = rows.filter(row => modes.get(row.workspace_id));
+  const decrypted = new Map((await decryptSuperBorrowers(encrypted, secret, gateway)).map(row => [row.id, row]));
+  return rows.map(row => {
+    if (modes.get(row.workspace_id)) {
+      const result = decrypted.get(row.id);
+      if (!result) throw new Error('Borrower data unavailable');
+      return result;
+    }
+    if (typeof row.username !== 'string' || typeof row.borrower_id !== 'string') throw new Error('Borrower data unavailable');
+    return { id: row.id, workspace_id: row.workspace_id, username: row.username, borrower_id: row.borrower_id };
+  });
+}

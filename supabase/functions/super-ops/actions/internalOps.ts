@@ -1,5 +1,6 @@
 import type { SuperOpsContext } from "../context.ts";
 import { decryptSuperBorrowers } from "../../_shared/superEncryptedBorrowers.ts";
+import { borrowerEncryptionModes } from "../../_shared/borrowerEncryptionMode.ts";
 
 export const INTERNAL_OPS_ACTIONS = ["get_internal_ops_snapshot"] as const;
 
@@ -189,7 +190,7 @@ export const handleInternalOpsAction = async (
         )
         : Promise.resolve({ data: [], error: null }),
       borrowerIds.length
-        ? adminClient.from("borrowers").select(encryptedMode ? "id,workspace_id,encrypted_data,nonce,auth_tag,key_version" : "id,workspace_id,username,borrower_id").in(
+        ? adminClient.from("borrowers").select("id,workspace_id,username,borrower_id,encrypted_data,nonce,auth_tag,key_version").in(
           "id",
           borrowerIds,
         )
@@ -217,9 +218,17 @@ export const handleInternalOpsAction = async (
     );
     if (borrowerRowsResult.error) return jsonResponse(503, { error: "Borrower data unavailable." });
     const sourceBorrowers = borrowerRowsResult.data ?? [];
-    const borrowers = encryptedMode
-      ? await decryptBorrowers(sourceBorrowers as unknown as Parameters<typeof decryptSuperBorrowers>[0], Deno.env.get("ITX_SGW_INTERNAL_SECRET") ?? "")
-      : sourceBorrowers as Array<{ id: string; workspace_id: string; username: string | null; borrower_id: string | null }>;
+    const typedBorrowers = sourceBorrowers as unknown as Array<{ id: string; workspace_id: string; username: string | null; borrower_id: string | null }>;
+    const modes = await borrowerEncryptionModes(adminClient, typedBorrowers.map(row => row.workspace_id), encryptedMode);
+    const encryptedRows = typedBorrowers.filter(row => modes.get(row.workspace_id));
+    const decrypted = await decryptBorrowers(encryptedRows as unknown as Parameters<typeof decryptSuperBorrowers>[0], Deno.env.get("ITX_SGW_INTERNAL_SECRET") ?? "");
+    const decryptedById = new Map(decrypted.map(row => [row.id, row]));
+    const borrowers = typedBorrowers.map(row => {
+      if (!modes.get(row.workspace_id)) return row;
+      const item = decryptedById.get(row.id);
+      if (!item) throw new Error("Borrower data unavailable");
+      return item;
+    });
     const borrowerMap = new Map(
       borrowers.map((borrower) => [
         borrower.id as string,

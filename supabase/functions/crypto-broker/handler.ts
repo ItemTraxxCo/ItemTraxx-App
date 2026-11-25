@@ -9,6 +9,7 @@ import { readJsonBody } from '../_shared/requestBody.ts';
 import { asRecord, optionalText, requireText, requireUuid, ValidationError } from '../_shared/validation.ts';
 import { resolveRateLimitResult } from '../_shared/preloginGuards.ts';
 import { callGateway } from './gateway.ts';
+import { borrowerEncryptionEnabled } from '../_shared/borrowerEncryptionMode.ts';
 
 const cors = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-request-id',
@@ -62,16 +63,21 @@ export function createBrokerHandler(overrides: Partial<Dependencies> = {}) {
     if (!resolveWorkspaceAccess(workspace, workspaceError).allowed) return reply(403, { error: 'Access denied' });
     const body = asRecord(await readJsonBody(req, 48 * 1024));
     const tenantDirectory = profile.role === 'tenant_account';
-    if (tenantDirectory && (body.action !== 'list' || body.archived === true)) return reply(403, { error: 'Access denied' });
+    if (tenantDirectory && (!['list', 'mode'].includes(String(body.action)) || body.archived === true)) return reply(403, { error: 'Access denied' });
     const deviceId = optionalText(body.device_id, { maxLen: 128 });
     const device = await deps.validateAccountDeviceSession(admin, { workspaceId: profile.workspace_id, profileId: session.user.id, deviceId, authToken: token });
     if (device.relationMissing) return reply(503, { error: 'Service unavailable' });
     if (!device.valid) return reply(401, { error: 'Session revoked' });
-    const rate = await user.rpc('consume_rate_limit', { p_scope: 'admin', p_limit: 30, p_window_seconds: 60 });
+    const directory = body.action === 'list';
+    const rate = await user.rpc('consume_rate_limit', { p_scope: directory ? (body.archived === true ? 'borrower_directory_archived' : 'borrower_directory') : 'admin', p_limit: directory ? 240 : 30, p_window_seconds: 60 });
     const { result: limit, response: failure } = resolveRateLimitResult({ data: rate.data, error: rate.error, jsonResponse: reply, failureStatus: 503 });
     if (failure) return failure;
     if (!limit?.allowed) return reply(429, { error: 'Rate limit exceeded', retry_after_seconds: limit?.retry_after_seconds ?? null });
     const workspaceId = profile.workspace_id;
+    if (body.action === 'mode') {
+      const enabled = await borrowerEncryptionEnabled(admin, workspaceId, deps.getEnv('ITX_ENCRYPTED_BORROWERS_LOCAL') === 'true');
+      return reply(200, { data: { encrypted: enabled } });
+    }
     if (body.action === 'create') {
       const input = asRecord(body.payload);
       const firstName = requireText(input.first_name, { maxLen: 100 });

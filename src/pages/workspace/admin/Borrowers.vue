@@ -289,7 +289,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { RouterLink } from "vue-router";
 import BoneyardSkeleton from "../../../components/BoneyardSkeleton.vue";
 import BoneyardTableFixture from "../../../components/BoneyardTableFixture.vue";
@@ -314,6 +314,8 @@ import { listTenantAccounts } from "../../../services/workspaceAdminManageServic
 import { useManagerContext } from "../../../composables/useManagerContext";
 
 const { isIndividualAccount, managerRoot } = useManagerContext();
+const authState = getAuthState();
+let sessionVersion = 0;
 
 const borrowers = ref<BorrowerItem[]>([]);
 const archivedBorrowers = ref<BorrowerItem[]>([]);
@@ -435,6 +437,7 @@ const applyBulkAccess = async () => {
 };
 
 const applyBulkArchive = async () => {
+  const version = sessionVersion;
   const targets = borrowers.value.filter((row) => selectedBorrowerIds.value.has(row.id));
   if (targets.length === 0) return;
   const confirmed = window.confirm(`Archive ${targets.length} selected borrower(s)? You can restore them later.`);
@@ -443,6 +446,7 @@ const applyBulkArchive = async () => {
   try {
     for (const item of targets) {
       await deleteBorrower(item.id);
+      if (version !== sessionVersion) return;
       borrowers.value = borrowers.value.filter((row) => row.id !== item.id);
       archivedBorrowers.value = [item, ...archivedBorrowers.value];
     }
@@ -503,20 +507,24 @@ const runToastAction = async () => {
 };
 
 const loadArchivedBorrowers = async () => {
+  const version = sessionVersion;
   isLoadingArchived.value = true;
   try {
-    archivedBorrowers.value = await fetchDeletedBorrowers();
+    const rows = await fetchDeletedBorrowers();
+    if (version === sessionVersion) archivedBorrowers.value = rows;
   } catch (err) {
+    if (version !== sessionVersion) return;
     archivedBorrowers.value = [];
     error.value = err instanceof Error ? err.message : "Unable to load archived borrowers.";
   } finally {
-    isLoadingArchived.value = false;
+    if (version === sessionVersion) isLoadingArchived.value = false;
   }
 };
 
 const borrowerAccessGrants = ref<Record<string, string[]>>({});
 
 const loadBorrowerAccessGrants = async () => {
+  const version = sessionVersion;
   const restrictedIds = borrowers.value.filter((row) => row.access_mode === "restricted").map((row) => row.id);
   if (restrictedIds.length === 0) {
     borrowerAccessGrants.value = {};
@@ -524,13 +532,14 @@ const loadBorrowerAccessGrants = async () => {
   }
   try {
     const grants = await fetchBorrowerAccessGrants(restrictedIds);
+    if (version !== sessionVersion) return;
     const map: Record<string, string[]> = {};
     for (const grant of grants) {
       (map[grant.borrower_id] ??= []).push(grant.profile_id);
     }
     borrowerAccessGrants.value = map;
   } catch {
-    borrowerAccessGrants.value = {};
+    if (version === sessionVersion) borrowerAccessGrants.value = {};
   }
 };
 
@@ -555,17 +564,21 @@ const scopedAccountsTitle = (item: BorrowerItem) => {
 };
 
 const loadBorrowers = async () => {
+  const version = sessionVersion;
   isLoading.value = true;
   error.value = "";
   try {
-    borrowers.value = await fetchBorrowers();
+    const rows = await fetchBorrowers();
+    if (version !== sessionVersion) return;
+    borrowers.value = rows;
     await loadBorrowerAccessGrants();
   } catch (err) {
+    if (version !== sessionVersion) return;
     error.value = err instanceof Error ? err.message : "Unable to load borrowers. Please sign out completeley and sign back in. If issue persists, contact support.";
   } finally {
-    isLoading.value = false;
+    if (version === sessionVersion) isLoading.value = false;
   }
-  await loadArchivedBorrowers();
+  if (version === sessionVersion) await loadArchivedBorrowers();
 };
 
 const exportRows = computed(() =>
@@ -590,6 +603,7 @@ const exportPdf = async () => {
 };
 
 const handleCreate = async () => {
+  const version = sessionVersion;
   error.value = "";
   success.value = "";
 
@@ -613,6 +627,7 @@ const handleCreate = async () => {
       access_mode: isIndividualAccount.value ? "all" : accessMode.value,
       profile_ids: isIndividualAccount.value ? [] : selectedProfileIds.value,
     });
+    if (version !== sessionVersion) return;
     borrowers.value = [created, ...borrowers.value];
     firstName.value = "";
     lastName.value = "";
@@ -633,10 +648,13 @@ const handleCreate = async () => {
 onMounted(() => {
   if (isBoneyardCapture) return;
   void (async () => {
+    const version = sessionVersion;
     await loadBorrowers();
+    if (version !== sessionVersion) return;
     if (!isIndividualAccount.value) {
       try {
         const accounts = await listTenantAccounts();
+        if (version !== sessionVersion) return;
         tenantAccounts.value = accounts
           .filter((account) => account.is_active)
           .map(({ id, auth_email }) => ({ id, auth_email }));
@@ -649,6 +667,7 @@ onMounted(() => {
 });
 
 const openDetails = async (item: BorrowerItem) => {
+  const version = sessionVersion;
   if (showDetails.value && selected.value?.id === item.id) {
     closeDetails();
     return;
@@ -658,8 +677,10 @@ const openDetails = async (item: BorrowerItem) => {
   detailsLoading.value = true;
   error.value = "";
   try {
-    details.value = await fetchBorrowerDetails(item.id);
+    const result = await fetchBorrowerDetails(item.id);
+    if (version === sessionVersion) details.value = result;
   } catch (err) {
+    if (version !== sessionVersion) return;
     error.value = err instanceof Error ? err.message : "Unable to load details. Please sign out completeley and sign back in. If issue persists, contact support.";
     details.value = null;
   } finally {
@@ -684,6 +705,7 @@ const formatTime = (value: string) => {
 };
 
 const removeBorrower = async (item: BorrowerItem) => {
+  const version = sessionVersion;
   const confirmed = window.confirm(`Archive borrower "${borrowerDisplayName(item)}"? You can restore them later if needed.`);
   if (!confirmed) return;
   error.value = "";
@@ -691,6 +713,7 @@ const removeBorrower = async (item: BorrowerItem) => {
   isSaving.value = true;
   try {
     await deleteBorrower(item.id);
+    if (version !== sessionVersion) return;
     borrowers.value = borrowers.value.filter((row) => row.id !== item.id);
     archivedBorrowers.value = [item, ...archivedBorrowers.value];
     success.value = "Borrower archived.";
@@ -718,11 +741,13 @@ const removeSelected = async () => {
 };
 
 const handleRestore = async (item: BorrowerItem) => {
+  const version = sessionVersion;
   error.value = "";
   success.value = "";
   isSaving.value = true;
   try {
     const restored = await restoreBorrower(item.id);
+    if (version !== sessionVersion) return;
     archivedBorrowers.value = archivedBorrowers.value.filter((row) => row.id !== item.id);
     borrowers.value = [restored, ...borrowers.value];
     success.value = "Borrower restored.";
@@ -733,7 +758,25 @@ const handleRestore = async (item: BorrowerItem) => {
   }
 };
 
+watch(() => [authState.userId, authState.workspaceContextId, authState.isAuthenticated], () => {
+  sessionVersion++;
+  borrowers.value = [];
+  archivedBorrowers.value = [];
+  borrowerAccessGrants.value = {};
+  tenantAccounts.value = [];
+  selected.value = null;
+  details.value = null;
+  showDetails.value = false;
+  searchQuery.value = "";
+  firstName.value = ""; lastName.value = ""; freeName.value = ""; borrowerId.value = ""; email.value = "";
+  toastTitle.value = ""; toastMessage.value = ""; toastAction.value = null; toastActionLabel.value = "";
+  if (authState.isAuthenticated && authState.workspaceContextId) void loadBorrowers();
+  else { isLoading.value = false; isLoadingArchived.value = false; }
+});
+
 onUnmounted(() => {
+  sessionVersion++;
+  borrowers.value = []; archivedBorrowers.value = []; selected.value = null; details.value = null;
   if (toastTimer) {
     window.clearTimeout(toastTimer);
     toastTimer = null;

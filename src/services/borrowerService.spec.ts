@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { clearAuthState, setAuthStateFromBackend, setWorkspaceContext } from "../store/authState";
 
+vi.mock("./borrowerEncryptionMode", () => ({
+  isEncryptedBorrowerDirectoryEnabled: async () => import.meta.env.VITE_ENCRYPTED_BORROWERS_LOCAL === "true",
+}));
+
 vi.mock("./edgeFunctionClient", () => ({
   invokeEdgeFunction: vi.fn(),
 }));

@@ -1,11 +1,10 @@
--- Run after the migration in an isolated Supabase test database.
+-- Run after the migration in an isolated Supabase test database. Fixtures roll back.
 begin;
 do $$
 declare
-  ws uuid;
+  ws uuid := gen_random_uuid();
 begin
-  select id into ws from public.workspaces limit 1;
-  if ws is null then raise exception 'A workspace fixture is required'; end if;
+  insert into public.workspaces(id,name,slug,status) values (ws,'Lifecycle Test','lifecycle-' || ws::text,'active');
   if not public.sgw_key_lifecycle_transition(ws, 'claim_provision') then raise exception 'first claim failed'; end if;
   if public.sgw_key_lifecycle_transition(ws, 'claim_provision') then raise exception 'duplicate claim succeeded'; end if;
   if public.sgw_key_lifecycle_transition(ws, 'is_active') then raise exception 'pending key is active'; end if;

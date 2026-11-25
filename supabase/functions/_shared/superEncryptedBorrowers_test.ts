@@ -1,7 +1,16 @@
 import { assertEquals, assertRejects } from 'https://deno.land/std@0.224.0/assert/mod.ts';
-import { decryptSuperBorrowers } from './superEncryptedBorrowers.ts';
+import { decryptSuperBorrowers, resolveMixedSuperBorrowers } from './superEncryptedBorrowers.ts';
 
 const row = (id: string, workspace_id: string) => ({ id, workspace_id, encrypted_data: 'cipher', nonce: 'nonce', auth_tag: 'tag', key_version: 1 });
+Deno.test('mixed workspaces decrypt only encrypted records and never fall back', async () => {
+  const encrypted = { ...row('a', 'w1'), username: 'enc_a', borrower_id: null };
+  const legacy = { ...row('b', 'w2'), username: 'Legacy Name', borrower_id: 'LEGACY' };
+  const gateway = async (_op: string, body: Record<string, unknown>) => ({ items: (body.items as { id: string }[]).map(item => ({ id: item.id, payload: { username: 'Decrypted Name', borrower_id: 'NEW' } })) });
+  const modes = new Map([['w1', true], ['w2', false]]);
+  assertEquals((await resolveMixedSuperBorrowers([encrypted, legacy], modes, 'secret', gateway)).map(item => item.username), ['Decrypted Name', 'Legacy Name']);
+  await assertRejects(() => resolveMixedSuperBorrowers([encrypted], new Map(), 'secret', gateway));
+  await assertRejects(() => resolveMixedSuperBorrowers([encrypted], modes, 'secret', async () => { throw new Error('unavailable'); }));
+});
 Deno.test('super borrower decrypt groups by workspace and preserves identity', async () => {
   const calls: string[] = [];
   const gateway = async (_op: string, body: Record<string, unknown>) => {

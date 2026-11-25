@@ -28,6 +28,14 @@ Deno.test("lifecycle local override only permits an explicit loopback origin", (
   }
 });
 
+Deno.test("lifecycle selects the gateway for the configured project", () => {
+  assert(resolveLifecycleOrigin(undefined, "https://nwuhjxicaopkmqydjlas.supabase.co") === "https://itemtraxx-sgw-staging.itemtraxx-co.workers.dev");
+  assert(resolveLifecycleOrigin(undefined, "https://mlaspkufocikfcbjgpof.supabase.co") === "https://sgw.itemtraxx.com");
+  let failed = false;
+  try { resolveLifecycleOrigin(undefined, "https://unknown.supabase.co"); } catch { failed = true; }
+  assert(failed);
+});
+
 Deno.test("purge revokes active and revoking keys and blocks uncertain state", async () => {
   for (const state of ["active", "revoking"]) {
     let revoked = false;

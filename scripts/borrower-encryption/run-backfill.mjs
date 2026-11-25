@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { backfillWorkspace } from './backfill.mjs';
 import { verifiedCutover } from './cutover.mjs';
+import { gatewayOriginForProject } from './gateway-origin.mjs';
 
 // A service-only database freeze must already be active. Secrets are env-only.
 const args = process.argv.slice(2);
@@ -16,6 +17,7 @@ const secret = process.env.ITX_SGW_INTERNAL_SECRET;
 let cutoverAttempted = false;
 try {
   if (!url || new URL(url).protocol !== 'https:' || !serviceKey || !secret || secret.length < 32) throw new Error('Missing configuration');
+  const gatewayOrigin = gatewayOriginForProject(url);
   const db = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
   const columns = 'id,workspace_id,username,borrower_id,encrypted_data,nonce,auth_tag,key_version,borrower_id_hash';
   const dataOrFail = ({ data, error }) => { if (error || !data) throw new Error('Database operation failed'); return data; };
@@ -56,7 +58,7 @@ try {
     },
   };
   const call = async (operation, body) => {
-    const response = await fetch(`https://sgw.itemtraxx.com/v1/crypto/${operation}`, { method: 'POST', headers: { authorization: `Bearer ${secret}`, 'content-type': 'application/json' }, body: JSON.stringify(body), redirect: 'error', signal: AbortSignal.timeout(5000) });
+    const response = await fetch(`${gatewayOrigin}/v1/crypto/${operation}`, { method: 'POST', headers: { authorization: `Bearer ${secret}`, 'content-type': 'application/json' }, body: JSON.stringify(body), redirect: 'error', signal: AbortSignal.timeout(5000) });
     if (!response.ok) throw new Error('Gateway operation failed');
     return await response.json();
   };

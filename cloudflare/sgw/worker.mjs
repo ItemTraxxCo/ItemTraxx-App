@@ -62,6 +62,10 @@ export async function handleRequest(request, env, transition = coordinate) {
     if (path.startsWith('/v1/kms/')) {
       const provision = path.endsWith('/generate-tenant-keys');
       if (provision && env.SGW_PROVISIONING_ENABLED !== 'true') return json(503, { error: 'Key provisioning disabled' });
+      if (provision && env.SGW_PROVISIONING_WORKSPACE !== undefined &&
+          (typeof env.SGW_PROVISIONING_WORKSPACE !== 'string' || !UUID.test(env.SGW_PROVISIONING_WORKSPACE) || env.SGW_PROVISIONING_WORKSPACE.toLowerCase() !== body.workspace_id)) {
+        return json(503, { error: 'Key provisioning disabled' });
+      }
       try {
         if (!await transition(provision ? 'claim_provision' : 'claim_revoke', body.workspace_id, env)) {
           if (provision) return json(409, { error: 'Lifecycle transition unavailable' });

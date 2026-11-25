@@ -19,6 +19,21 @@ test('provisioning is disabled by default and does not touch the coordinator or 
   assert.equal(touched, false);
 });
 
+test('a configured provisioning workspace allows only that workspace', async () => {
+  let claims = 0;
+  const custom = { ...env, SGW_PROVISIONING_WORKSPACE: workspace, KEYS: { get: async () => null, put: async () => {} } };
+  const transition = async () => { claims++; return true; };
+  const wrong = await handleRequest(request('/v1/kms/generate-tenant-keys', { workspace_id: crypto.randomUUID() }, env.KMS_LIFECYCLE_SECRET), custom, transition);
+  assert.equal(wrong.status, 503);
+  assert.equal(claims, 0);
+  const allowed = await handleRequest(request('/v1/kms/generate-tenant-keys', { workspace_id: workspace.toUpperCase() }, env.KMS_LIFECYCLE_SECRET), custom, transition);
+  assert.equal(allowed.status, 200);
+  assert.equal(claims, 2);
+  const invalid = { ...custom, SGW_PROVISIONING_WORKSPACE: 'not-a-uuid' };
+  assert.equal((await handleRequest(request('/v1/kms/generate-tenant-keys', { workspace_id: workspace }, env.KMS_LIFECYCLE_SECRET), invalid, transition)).status, 503);
+  assert.equal(claims, 2);
+});
+
 test('closing the provisioning gate does not prevent revocation', async () => {
   let state = 'active';
   const coordinator = async (action) => {

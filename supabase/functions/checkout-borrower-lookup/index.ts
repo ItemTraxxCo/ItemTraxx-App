@@ -15,6 +15,7 @@ import {
   ValidationError,
 } from "../_shared/validation.ts";
 import { hashBorrowerId, decryptBorrower } from "../_shared/encryptedBorrower.ts";
+import { borrowerEncryptionEnabled } from "../_shared/borrowerEncryptionMode.ts";
 import { logError, withRequestSpan } from "../_shared/observability.ts";
 
 const baseCorsHeaders = {
@@ -138,7 +139,7 @@ serve((req) => withRequestSpan(req, "POST /functions/checkout-borrower-lookup", 
     const activeSession = await validateAccountDeviceSession(adminClient,{workspaceId:profile.workspace_id,profileId:authData.user.id,deviceId,authToken});
     if(activeSession.relationMissing)return jsonResponse(503,{error:"Session controls unavailable"});
     if(!activeSession.valid)return jsonResponse(401,{error:"Session revoked"});
-    const encryptedMode = Deno.env.get("ITX_ENCRYPTED_BORROWERS_LOCAL") === "true";
+    const encryptedMode = await borrowerEncryptionEnabled(adminClient, profile.workspace_id, Deno.env.get("ITX_ENCRYPTED_BORROWERS_LOCAL") === "true");
     const borrowerId = requireText(body.borrower_id, encryptedMode ? { maxLen: 32 } : {
       maxLen: 6, pattern: BORROWER_ID_PATTERN, transform: "uppercase",
     });

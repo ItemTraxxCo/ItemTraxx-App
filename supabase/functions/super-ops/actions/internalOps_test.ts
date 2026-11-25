@@ -67,6 +67,7 @@ const buildAdminClient = (
   };
   return {
     from,
+    rpc: (_name: string, args: { p_workspace_ids: string[] }) => Promise.resolve({ data: args.p_workspace_ids.map(workspace_id => ({ workspace_id, encrypted_only: false })), error: null }),
     functions: { invoke },
   };
 };

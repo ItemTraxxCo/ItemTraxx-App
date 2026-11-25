@@ -1,4 +1,5 @@
 import { serve } from "../_shared/serve.ts";
+import { borrowerEncryptionEnabled } from "../_shared/borrowerEncryptionMode.ts";
 import { getExternalAuthUser } from "../_shared/externalAuth.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.108.2";
 import { isKillSwitchWriteBlocked } from "../_shared/killSwitch.ts";
@@ -551,7 +552,7 @@ serve(async (req) => {
 
     // These legacy operations use plaintext identity columns. Encrypted mode
     // must go through the broker and must never silently fall back to them.
-    if (Deno.env.get("ITX_ENCRYPTED_BORROWERS_LOCAL") === "true" && ["create", "bulk_create", "restore", "list_deleted"].includes(action)) {
+    if (["create", "bulk_create", "restore", "list_deleted"].includes(action) && await borrowerEncryptionEnabled(adminClient, profile.workspace_id, Deno.env.get("ITX_ENCRYPTED_BORROWERS_LOCAL") === "true")) {
       return jsonResponse(503, { error: "Use encrypted borrower management." });
     }
 

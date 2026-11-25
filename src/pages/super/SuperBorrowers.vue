@@ -20,14 +20,14 @@
       <h2>Create Borrower</h2>
       <form class="form" @submit.prevent="handleCreate">
         <label>Workspace<select v-model="formWorkspaceId"><option value="">Select workspace</option><option v-for="t in workspaces" :key="t.id" :value="t.id">{{ t.name }}</option></select></label>
-        <template v-if="encryptedMode">
+        <template v-if="encryptedMode === true">
           <fieldset><legend>Name format</legend><label><input v-model="nameMode" type="radio" value="split" /> First &amp; Last Name</label><label><input v-model="nameMode" type="radio" value="free" /> Free Input</label></fieldset>
           <label>{{ nameMode === 'split' ? 'First Name' : 'Name / Identifier' }}<input v-model="firstName" type="text" maxlength="100" required /></label>
           <label v-if="nameMode === 'split'">Last Name<input v-model="lastName" type="text" maxlength="100" /></label>
           <label>Borrower ID<input v-model="borrowerId" type="text" maxlength="32" pattern="[A-Za-z0-9]+" required /></label>
           <label>Email<input v-model="email" type="email" maxlength="254" /></label>
         </template>
-        <template v-else>
+        <template v-else-if="encryptedMode === false">
         <label>
           Username
           <input v-model="previewUsername" type="text" readonly title="If you need to change this, contact support." />
@@ -38,8 +38,8 @@
         </label>
         </template>
         <div class="panel-actions">
-          <button v-if="!encryptedMode" type="button" class="sa-btn" @click="regenerateIdentity">Regenerate</button>
-          <button type="submit" class="sa-btn primary" :disabled="isSaving">Create</button>
+          <button v-if="encryptedMode === false" type="button" class="sa-btn" @click="regenerateIdentity">Regenerate</button>
+          <button type="submit" class="sa-btn primary" :disabled="isSaving || encryptedMode === null">Create</button>
         </div>
       </form>
     </section>
@@ -100,7 +100,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { RouterLink, useRouter } from "vue-router";
 import SkeletonLoader from "../../components/SkeletonLoader.vue";
 import StepUpModal from "../../components/StepUpModal.vue";
@@ -108,13 +108,16 @@ import {
   handleSuperAdminUnauthorized,
   isUnauthorizedError,
 } from "../../services/authErrorHandling";
-import { createSuperBorrower, deleteSuperBorrower, listSuperBorrowers, type SuperBorrowerItem } from "../../services/superBorrowerService";
+import { createSuperBorrower, deleteSuperBorrower, getSuperBorrowerEncryptionMode, listSuperBorrowers, type SuperBorrowerItem } from "../../services/superBorrowerService";
 import { listWorkspaces as listWorkspaces, type SuperWorkspace as SuperWorkspace } from "../../services/superWorkspaceService";
 import { exportRowsToCsv, exportRowsToPdf } from "../../services/exportService";
 import { generateBorrowerIdentity } from "../../utils/borrowerIdentity";
 import { toUserFacingErrorMessage } from "../../services/appErrors";
+import { getAuthState } from "../../store/authState";
 
 const router = useRouter();
+const authState = getAuthState();
+let sessionVersion = 0;
 const workspaces = ref<SuperWorkspace[]>([]);
 const borrowers = ref<SuperBorrowerItem[]>([]);
 const workspaceFilter = ref("all");
@@ -123,7 +126,8 @@ const isLoading = ref(false);
 const isSaving = ref(false);
 const error = ref("");
 const formWorkspaceId = ref("");
-const encryptedMode = import.meta.env.DEV && import.meta.env.VITE_ENCRYPTED_BORROWERS_LOCAL === "true";
+const encryptedMode = ref<boolean | null>(null);
+let modeVersion = 0;
 const nameMode = ref<"split" | "free">("split");
 const firstName = ref("");
 const lastName = ref("");
@@ -161,9 +165,12 @@ const showToast = (title: string, message: string) => {
 };
 
 const loadTenants = async () => {
+  const version = sessionVersion;
   try {
-    workspaces.value = await listWorkspaces("", "all");
+    const rows = await listWorkspaces("", "all");
+    if (version === sessionVersion) workspaces.value = rows;
   } catch (err) {
+    if (version !== sessionVersion) return;
     if (isUnauthorizedError(err)) {
       error.value = "Your session expired. Sign in again.";
       await handleSuperAdminUnauthorized(router);
@@ -174,11 +181,15 @@ const loadTenants = async () => {
 };
 
 const loadBorrowers = async () => {
+  const version = sessionVersion;
   isLoading.value = true;
   error.value = "";
   try {
-    borrowers.value = await listSuperBorrowers(workspaceFilter.value, search.value.trim());
+    const rows = await listSuperBorrowers(workspaceFilter.value, search.value.trim());
+    if (version !== sessionVersion) return;
+    borrowers.value = rows;
   } catch (err) {
+    if (version !== sessionVersion) return;
     if (isUnauthorizedError(err)) {
       error.value = "Your session expired. Sign in again.";
       await handleSuperAdminUnauthorized(router);
@@ -186,7 +197,7 @@ const loadBorrowers = async () => {
     }
     error.value = toUserFacingErrorMessage(err, "Unable to load borrowers.");
   } finally {
-    isLoading.value = false;
+    if (version === sessionVersion) isLoading.value = false;
   }
 };
 
@@ -216,11 +227,13 @@ const exportPdf = async () => {
 };
 
 const handleCreate = async () => {
+  const version = sessionVersion;
   if (!formWorkspaceId.value) {
     showToast("Invalid input", "Tenant is required.");
     return;
   }
-  if (encryptedMode && (!firstName.value.trim() || !/^[a-z0-9]{1,32}$/i.test(borrowerId.value.trim()))) {
+  if (encryptedMode.value === null) return;
+  if (encryptedMode.value && (!firstName.value.trim() || !/^[a-z0-9]{1,32}$/i.test(borrowerId.value.trim()))) {
     showToast("Invalid input", "Name and alphanumeric borrower ID are required.");
     return;
   }
@@ -228,12 +241,13 @@ const handleCreate = async () => {
   try {
     const created = await createSuperBorrower({
       workspace_id: formWorkspaceId.value,
-      ...(encryptedMode ? { first_name: firstName.value.trim(), last_name: nameMode.value === "split" ? lastName.value.trim() || null : null, borrower_id: borrowerId.value.trim(), email: email.value.trim() || null } : { username: previewUsername.value, borrower_id: previewBorrowerId.value }),
+      ...(encryptedMode.value ? { first_name: firstName.value.trim(), last_name: nameMode.value === "split" ? lastName.value.trim() || null : null, borrower_id: borrowerId.value.trim(), email: email.value.trim() || null } : { username: previewUsername.value, borrower_id: previewBorrowerId.value }),
     });
+    if (version !== sessionVersion) return;
     borrowers.value = [created, ...borrowers.value];
     previewUsername.value = created.username;
     previewBorrowerId.value = created.borrower_id;
-    if (encryptedMode) { firstName.value = ""; lastName.value = ""; borrowerId.value = ""; email.value = ""; } else regenerateIdentity();
+    if (encryptedMode.value) { firstName.value = ""; lastName.value = ""; borrowerId.value = ""; email.value = ""; } else regenerateIdentity();
     showToast("Created", "Borrower created.");
   } catch (err) {
     showToast("Create failed", toUserFacingErrorMessage(err, "Unable to create borrower."));
@@ -266,6 +280,7 @@ const closeStepUp = () => {
 };
 
 const confirmDelete = async (payload: { superPassword: string; confirmPhrase: string }) => {
+  const version = sessionVersion;
   if (!deleteTarget.value) return;
   isSaving.value = true;
   try {
@@ -274,6 +289,7 @@ const confirmDelete = async (payload: { superPassword: string; confirmPhrase: st
       super_password: payload.superPassword,
       confirm_phrase: payload.confirmPhrase,
     });
+    if (version !== sessionVersion) return;
     borrowers.value = borrowers.value.filter((item) => item.id !== deleteTarget.value!.id);
     showToast("Deleted", "Borrower deleted.");
     closeStepUp();
@@ -284,11 +300,36 @@ const confirmDelete = async (payload: { superPassword: string; confirmPhrase: st
   }
 };
 
+watch(formWorkspaceId, async (workspaceId) => {
+  const version = ++modeVersion;
+  encryptedMode.value = null;
+  firstName.value = ""; lastName.value = ""; borrowerId.value = ""; email.value = "";
+  if (!workspaceId) return;
+  try {
+    const mode = await getSuperBorrowerEncryptionMode(workspaceId);
+    if (version !== modeVersion) return;
+    encryptedMode.value = mode;
+    if (!mode) regenerateIdentity();
+  } catch {
+    if (version === modeVersion) showToast("Unable to load", "Could not determine borrower encryption status.");
+  }
+});
+
+watch(() => [authState.userId, authState.isAuthenticated], () => {
+  sessionVersion++; modeVersion++;
+  borrowers.value = []; workspaces.value = []; editItem.value = null; deleteTarget.value = null;
+  editUsername.value = ""; editBorrowerId.value = ""; firstName.value = ""; lastName.value = "";
+  borrowerId.value = ""; email.value = ""; search.value = ""; formWorkspaceId.value = "";
+  toastTitle.value = ""; toastMessage.value = ""; stepUpVisible.value = false; encryptedMode.value = null;
+});
+
+onUnmounted(() => { sessionVersion++; modeVersion++; borrowers.value = []; workspaces.value = []; });
+
 onMounted(() => {
-  if (!encryptedMode) regenerateIdentity();
   void (async () => {
+    const version = sessionVersion;
     await loadTenants();
-    await loadBorrowers();
+    if (version === sessionVersion) await loadBorrowers();
   })();
 });
 </script>

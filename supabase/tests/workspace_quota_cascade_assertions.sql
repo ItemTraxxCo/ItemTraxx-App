@@ -31,4 +31,21 @@ do $$ begin
     raise exception 'cascade left workspace data behind';
   end if;
 end $$;
+
+insert into public.workspaces (id, name, slug, status, archived_at, purge_after, purge_state)
+values ('d2e37e92-845c-49e0-8e23-acf280177005', 'Synthetic purge test', 'synthetic-quota-purge', 'suspended', now() - interval '2 days', now() - interval '1 day', 'purging');
+insert into public.borrowers (workspace_id, username, borrower_id)
+values ('d2e37e92-845c-49e0-8e23-acf280177005', 'Synthetic', 'SYNTHETIC-3');
+insert into public.items (workspace_id, name, status)
+values ('d2e37e92-845c-49e0-8e23-acf280177005', 'Synthetic item', 'available');
+insert into public.sgw_workspace_key_lifecycle (workspace_id, state)
+values ('d2e37e92-845c-49e0-8e23-acf280177005', 'revoked');
+set local role service_role;
+select public.purge_workspace_data('d2e37e92-845c-49e0-8e23-acf280177005', '{}'::jsonb);
+reset role;
+do $$ begin
+  if exists (select 1 from public.workspaces where id = 'd2e37e92-845c-49e0-8e23-acf280177005') then
+    raise exception 'workspace purge did not remove the workspace';
+  end if;
+end $$;
 rollback;

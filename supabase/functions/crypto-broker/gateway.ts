@@ -1,8 +1,12 @@
 export type GatewayOperation = 'encrypt' | 'decrypt' | 'hash-index';
 
 // The override is server-only and restricted to loopback for local integration.
-export function resolveGatewayOrigin(localOrigin: string | undefined): string {
-  if (!localOrigin) return 'https://sgw.itemtraxx.com';
+export function resolveGatewayOrigin(localOrigin: string | undefined, projectUrl?: string): string {
+  if (!localOrigin) {
+    if (!projectUrl || projectUrl === 'https://mlaspkufocikfcbjgpof.supabase.co') return 'https://sgw.itemtraxx.com';
+    if (projectUrl === 'https://nwuhjxicaopkmqydjlas.supabase.co') return 'https://itemtraxx-sgw-staging.itemtraxx-co.workers.dev';
+    throw new Error('Gateway unavailable');
+  }
   try {
     const url = new URL(localOrigin);
     if (url.protocol !== 'http:' || url.hostname !== '127.0.0.1' || !url.port || url.username || url.password || url.href !== `${url.origin}/`) throw new Error();
@@ -19,7 +23,7 @@ export async function callGateway(
 ): Promise<Record<string, unknown>> {
   if (secret.length < 32) throw new Error('Gateway unavailable');
   try {
-    const origin = resolveGatewayOrigin(Deno.env.get('ITX_SGW_LOCAL_ORIGIN'));
+    const origin = resolveGatewayOrigin(Deno.env.get('ITX_SGW_LOCAL_ORIGIN'), Deno.env.get('SUPABASE_URL'));
     const response = await fetcher(`${origin}/v1/crypto/${operation}`, {
       method: 'POST',
       headers: { authorization: `Bearer ${secret}`, 'content-type': 'application/json' },

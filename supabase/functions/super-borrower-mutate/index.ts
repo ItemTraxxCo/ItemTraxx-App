@@ -13,7 +13,7 @@ import { writeSuperAdminAudit } from "../_shared/superAdminAudit.ts";
 import { resolveCorsHeaders } from "../_shared/cors.ts";
 import { readJsonBody } from "../_shared/requestBody.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
-import { resolveMixedSuperBorrowers } from "../_shared/superEncryptedBorrowers.ts";
+import { loadLegacyBorrowerFields, resolveMixedSuperBorrowers } from "../_shared/superEncryptedBorrowers.ts";
 import { borrowerEncryptionEnabled, borrowerEncryptionModes } from "../_shared/borrowerEncryptionMode.ts";
 import { callGateway } from "../crypto-broker/gateway.ts";
 import {
@@ -331,7 +331,7 @@ serve(async (req) => {
 
       let query = adminClient
         .from("borrowers")
-        .select("id,workspace_id,username,borrower_id,encrypted_data,nonce,auth_tag,key_version,created_at")
+        .select("id,workspace_id,encrypted_data,nonce,auth_tag,key_version,created_at")
         .order("created_at", { ascending: false })
         .limit(500);
 
@@ -350,7 +350,12 @@ serve(async (req) => {
         created_at: string;
       }>;
       const modes = await borrowerEncryptionModes(adminClient, sourceRows.map(row => row.workspace_id), localPreview);
-      const rows = (await resolveMixedSuperBorrowers(sourceRows as unknown as Parameters<typeof resolveMixedSuperBorrowers>[0], modes, Deno.env.get("ITX_SGW_INTERNAL_SECRET") ?? "")).map((row, index) => ({ ...row, created_at: sourceRows[index].created_at }));
+      const hydrated = await loadLegacyBorrowerFields(sourceRows as unknown as Parameters<typeof loadLegacyBorrowerFields>[0], modes, async ids => {
+        const { data, error } = await adminClient.from("borrowers").select("id,workspace_id,username,borrower_id").in("id", ids);
+        if (error) throw new Error("Borrower data unavailable");
+        return data ?? [];
+      });
+      const rows = (await resolveMixedSuperBorrowers(hydrated, modes, Deno.env.get("ITX_SGW_INTERNAL_SECRET") ?? "")).map((row, index) => ({ ...row, created_at: sourceRows[index].created_at }));
       if (!search) {
         return jsonResponse(200, { data: rows });
       }
@@ -454,7 +459,7 @@ serve(async (req) => {
 
       const { data, error } = await adminClient
         .from("borrowers")
-        .select("id,workspace_id,username,borrower_id,encrypted_data,nonce,auth_tag,key_version,created_at")
+        .select("id,workspace_id,encrypted_data,nonce,auth_tag,key_version,created_at")
         .eq("id", id)
         .single();
 
@@ -463,7 +468,12 @@ serve(async (req) => {
       }
       const source = data as unknown as Parameters<typeof resolveMixedSuperBorrowers>[0][number] & { created_at: string };
       const modes = await borrowerEncryptionModes(adminClient, [source.workspace_id], localPreview);
-      const [borrower] = await resolveMixedSuperBorrowers([source], modes, Deno.env.get("ITX_SGW_INTERNAL_SECRET") ?? "");
+      const hydrated = await loadLegacyBorrowerFields([source], modes, async ids => {
+        const { data, error } = await adminClient.from("borrowers").select("id,workspace_id,username,borrower_id").in("id", ids);
+        if (error) throw new Error("Borrower data unavailable");
+        return data ?? [];
+      });
+      const [borrower] = await resolveMixedSuperBorrowers(hydrated, modes, Deno.env.get("ITX_SGW_INTERNAL_SECRET") ?? "");
       return jsonResponse(200, { data: { ...borrower, created_at: source.created_at } });
     }
 

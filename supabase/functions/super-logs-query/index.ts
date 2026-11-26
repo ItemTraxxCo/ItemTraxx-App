@@ -9,7 +9,7 @@ import { isSuperAdminTokenBlockedBySessionRevocation } from "../_shared/superAdm
 import { resolveCorsHeaders } from "../_shared/cors.ts";
 import { readJsonBody } from "../_shared/requestBody.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
-import { resolveMixedSuperBorrowers } from "../_shared/superEncryptedBorrowers.ts";
+import { loadLegacyBorrowerFields, resolveMixedSuperBorrowers } from "../_shared/superEncryptedBorrowers.ts";
 import { borrowerEncryptionModes } from "../_shared/borrowerEncryptionMode.ts";
 import {
   optionalInteger,
@@ -224,7 +224,7 @@ serve(async (req) => {
       borrowerIds.length
         ? adminClient
             .from("borrowers")
-            .select("id,workspace_id,username,borrower_id,encrypted_data,nonce,auth_tag,key_version")
+            .select("id,workspace_id,encrypted_data,nonce,auth_tag,key_version")
             .in("id", borrowerIds)
         : Promise.resolve({ data: [], error: null }),
       workspaceIds.length
@@ -241,7 +241,12 @@ serve(async (req) => {
     const borrowerRows = borrowerResult.data ?? [];
     const typedBorrowers = borrowerRows as unknown as Parameters<typeof resolveMixedSuperBorrowers>[0];
     const modes = await borrowerEncryptionModes(adminClient, typedBorrowers.map(row => row.workspace_id), Deno.env.get("ITX_ENCRYPTED_BORROWERS_LOCAL") === "true");
-    const borrowers = await resolveMixedSuperBorrowers(typedBorrowers, modes, Deno.env.get("ITX_SGW_INTERNAL_SECRET") ?? "");
+    const hydrated = await loadLegacyBorrowerFields(typedBorrowers, modes, async ids => {
+      const { data, error } = await adminClient.from("borrowers").select("id,workspace_id,username,borrower_id").in("id", ids);
+      if (error) throw new Error("Borrower data unavailable");
+      return data ?? [];
+    });
+    const borrowers = await resolveMixedSuperBorrowers(hydrated, modes, Deno.env.get("ITX_SGW_INTERNAL_SECRET") ?? "");
     const borrowerById = new Map(borrowers.map((item) => [item.id, item]));
     const tenantById = new Map(
       ((tenantResult.data ?? []) as Array<{ id: string; name: string }>).map((item) => [

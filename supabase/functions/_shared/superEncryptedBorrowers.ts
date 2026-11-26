@@ -3,6 +3,17 @@ import { callGateway } from '../crypto-broker/gateway.ts';
 
 type Row = { id: string; workspace_id: string; encrypted_data: string | null; nonce: string | null; auth_tag: string | null; key_version: number | null };
 type Gateway = (op: 'hash-index' | 'decrypt', body: Record<string, unknown>, secret: string) => Promise<Record<string, unknown>>;
+type Legacy = { id: string; workspace_id: string; username: string | null; borrower_id: string | null };
+
+// Read old identity columns only when a workspace still requires them.
+export async function loadLegacyBorrowerFields<T extends Row>(rows: T[], modes: Map<string, boolean>, load: (ids: string[]) => Promise<Legacy[]>) {
+  if (rows.some(row => !modes.has(row.workspace_id))) throw new Error('Borrower data unavailable');
+  const legacy = rows.filter(row => !modes.get(row.workspace_id));
+  const values = legacy.length ? await load(legacy.map(row => row.id)) : [];
+  const byId = new Map(values.map(row => [row.id, row]));
+  if (byId.size !== legacy.length || legacy.some(row => byId.get(row.id)?.workspace_id !== row.workspace_id)) throw new Error('Borrower data unavailable');
+  return rows.map(row => ({ ...row, username: byId.get(row.id)?.username ?? null, borrower_id: byId.get(row.id)?.borrower_id ?? null }));
+}
 
 // Call only after super-admin authorization. Never mix workspace keys or return
 // a partial result if any workspace or record fails authentication.

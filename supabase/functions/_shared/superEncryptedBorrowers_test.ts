@@ -1,7 +1,17 @@
 import { assertEquals, assertRejects } from 'https://deno.land/std@0.224.0/assert/mod.ts';
-import { decryptSuperBorrowers, resolveMixedSuperBorrowers } from './superEncryptedBorrowers.ts';
+import { decryptSuperBorrowers, resolveMixedSuperBorrowers, loadLegacyBorrowerFields } from './superEncryptedBorrowers.ts';
 
 const row = (id: string, workspace_id: string) => ({ id, workspace_id, encrypted_data: 'cipher', nonce: 'nonce', auth_tag: 'tag', key_version: 1 });
+Deno.test('legacy columns are requested only for legacy workspaces', async () => {
+  const requested: string[][] = [];
+  const load = (ids: string[]) => { requested.push(ids); return Promise.resolve([{ id: 'b', workspace_id: 'w2', username: 'Legacy', borrower_id: 'ID' }]); };
+  const mixed = await loadLegacyBorrowerFields([row('a', 'w1'), row('b', 'w2')], new Map([['w1', true], ['w2', false]]), load);
+  assertEquals(requested, [['b']]);
+  assertEquals(mixed[1].username, 'Legacy');
+  await loadLegacyBorrowerFields([row('a', 'w1')], new Map([['w1', true]]), load);
+  assertEquals(requested, [['b']]);
+  await assertRejects(() => loadLegacyBorrowerFields([row('b', 'w2')], new Map([['w2', false]]), async () => []));
+});
 Deno.test('mixed workspaces decrypt only encrypted records and never fall back', async () => {
   const encrypted = { ...row('a', 'w1'), username: 'enc_a', borrower_id: null };
   const legacy = { ...row('b', 'w2'), username: 'Legacy Name', borrower_id: 'LEGACY' };

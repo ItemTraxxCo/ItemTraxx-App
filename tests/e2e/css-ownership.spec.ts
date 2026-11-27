@@ -96,7 +96,7 @@ test.describe("global CSS ownership contracts", () => {
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.route(/\/functions(?:\/v1)?\/super-item-mutate(?:\?.*)?$/, async (route) => {
       const body = (route.request().postDataJSON() as { action?: string }) ?? {};
-      if (body.action !== "list") {
+      if (body.action !== "list" && body.action !== "list_metadata") {
         await route.fallback();
         return;
       }

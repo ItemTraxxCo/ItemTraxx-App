@@ -73,7 +73,7 @@ Deno.test("tampered JIT ticket signature is rejected", async () => {
     { privateJwk },
   );
 
-  const [header, payload, sig] = token.split(".");
+  const [header, , sig] = token.split(".");
   const tamperedPayload = btoa(
     JSON.stringify({
       iss: "itemtraxx-jit",

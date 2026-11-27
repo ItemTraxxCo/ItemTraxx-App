@@ -2,7 +2,7 @@
   <div v-if="visible" class="top-menu">
     <div class="menu-button-wrap">
       <div v-if="showNotificationBell" class="menu-notification">
-        <NotificationBell />
+        <NotificationBell @opened="emit('closeMenu')" />
       </div>
       <button
         type="button"

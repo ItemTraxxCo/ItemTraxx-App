@@ -205,9 +205,9 @@
                   {{ formatActionLabel(event.action_type) }}
                 </span>
               </td>
-              <td>{{ event.item_name ?? "-" }}</td>
-              <td>{{ event.item_barcode ?? "-" }}</td>
-              <td data-session-replay-mask>{{ event.borrower_username ?? "-" }}</td>
+              <td>{{ event.item_name ?? "Redacted (JIT required)" }}</td>
+              <td>{{ event.item_barcode ?? "Redacted" }}</td>
+              <td data-session-replay-mask>{{ event.borrower_username ?? "Redacted (JIT required)" }}</td>
             </tr>
           </tbody>
         </table>

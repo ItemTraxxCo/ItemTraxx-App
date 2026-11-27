@@ -41,7 +41,14 @@ describe("listSuperLogs", () => {
       method: "POST",
       body: { payload: { workspace_id: "ws-1", action_type: "checkout", page: 2, page_size: 25 } },
     });
-    expect(result).toEqual({ rows: [logEntry], page: 2, pageSize: 25, count: 51 });
+    expect(result).toEqual({
+      rows: [logEntry],
+      page: 2,
+      pageSize: 25,
+      count: 51,
+      payloadMode: "metadata",
+      piiRedacted: true,
+    });
   });
 
   it("falls back to defaults when the server omits pagination fields", async () => {
@@ -49,7 +56,14 @@ describe("listSuperLogs", () => {
 
     const result = await listSuperLogs({});
 
-    expect(result).toEqual({ rows: [], page: 1, pageSize: 50, count: 0 });
+    expect(result).toEqual({
+      rows: [],
+      page: 1,
+      pageSize: 50,
+      count: 0,
+      payloadMode: "metadata",
+      piiRedacted: true,
+    });
   });
 
   it("uses the requested page_size as a fallback when the server does not echo one back", async () => {

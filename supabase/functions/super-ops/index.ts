@@ -23,7 +23,7 @@ import { logError, withRequestSpan } from "../_shared/observability.ts";
 
 const baseCorsHeaders = {
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-request-id, traceparent, tracestate",
+    "authorization, x-client-info, apikey, content-type, x-request-id, x-itx-jit-ticket, traceparent, tracestate",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   Vary: "Origin",
 };

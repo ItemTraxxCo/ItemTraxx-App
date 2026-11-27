@@ -28,7 +28,12 @@ type SuperOpsAction =
   | "move_sales_lead_to_customer"
   | "list_customers"
   | "add_customer_status_entry"
-  | "get_internal_ops_snapshot";
+  | "get_internal_ops_snapshot"
+  | "request_jit_ticket"
+  | "invoke_break_glass"
+  | "revoke_jit_ticket"
+  | "list_jit_tickets"
+  | "list_jit_audit_logs";
 
 export type SuperOpsRequest = {
   action: SuperOpsAction;

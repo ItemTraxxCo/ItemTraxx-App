@@ -13,9 +13,13 @@ import { writeSuperAdminAudit } from "../_shared/superAdminAudit.ts";
 import { resolveCorsHeaders } from "../_shared/cors.ts";
 import { readJsonBody } from "../_shared/requestBody.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
-import { loadLegacyBorrowerFields, resolveMixedSuperBorrowers } from "../_shared/superEncryptedBorrowers.ts";
-import { borrowerEncryptionEnabled, borrowerEncryptionModes } from "../_shared/borrowerEncryptionMode.ts";
-import { callGateway } from "../crypto-broker/gateway.ts";
+import { decryptSuperBorrowersWithJit } from "../_shared/superEncryptedBorrowers.ts";
+import { borrowerEncryptionEnabled } from "../_shared/borrowerEncryptionMode.ts";
+import { callJitGateway } from "../crypto-broker/gateway.ts";
+import {
+  recordJitTicketUse,
+  requireValidJitTicket,
+} from "../_shared/jitTicket.ts";
 import {
   optionalText,
   requireText,
@@ -28,7 +32,7 @@ import {
 
 const baseCorsHeaders = {
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-request-id",
+    "authorization, x-client-info, apikey, content-type, x-request-id, x-itx-jit-ticket",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   Vary: "Origin",
 };
@@ -61,7 +65,16 @@ type SuperBorrowerDatabase = {
       };
     };
     Views: Record<string, never>;
-    Functions: { borrower_workspace_encryption_enabled: { Args: { p_workspace_id: string }; Returns: boolean }; borrower_workspace_encryption_modes: { Args: { p_workspace_ids: string[] }; Returns: Array<{ workspace_id: string; encrypted_only: boolean }> }; super_create_encrypted_borrower: { Args: { p_id: string; p_workspace_id: string; p_actor_id: string; p_encrypted_data: string; p_nonce: string; p_auth_tag: string; p_borrower_id_hash: string; p_borrower_email_hash: string | null }; Returns: string }; super_delete_encrypted_borrower: { Args: { p_id: string; p_actor_id: string }; Returns: boolean } };
+    Functions: {
+      borrower_workspace_encryption_enabled: { Args: { p_workspace_id: string }; Returns: boolean };
+      borrower_workspace_encryption_modes: { Args: { p_workspace_ids: string[] }; Returns: Array<{ workspace_id: string; encrypted_only: boolean }> };
+      super_create_encrypted_borrower: { Args: { p_id: string; p_workspace_id: string; p_actor_id: string; p_encrypted_data: string; p_nonce: string; p_auth_tag: string; p_borrower_id_hash: string; p_borrower_email_hash: string | null }; Returns: string };
+      super_delete_encrypted_borrower: { Args: { p_id: string; p_actor_id: string }; Returns: boolean };
+      super_create_encrypted_borrower_with_jit: { Args: { p_ticket_id: string; p_token_jti: string; p_id: string; p_workspace_id: string; p_actor_id: string; p_encrypted_data: string; p_nonce: string; p_auth_tag: string; p_borrower_id_hash: string; p_borrower_email_hash: string | null }; Returns: string };
+      super_delete_encrypted_borrower_with_jit: { Args: { p_ticket_id: string; p_token_jti: string; p_id: string; p_workspace_id: string; p_actor_id: string }; Returns: boolean };
+      verify_jit_support_ticket: { Args: { p_ticket_id: string; p_token_jti: string; p_admin_user_id: string; p_workspace_id: string; p_required_scope: string; p_at?: string }; Returns: boolean };
+      append_jit_audit_log: { Args: Record<string, unknown>; Returns: string };
+    };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
   };
@@ -322,40 +335,79 @@ serve(async (req) => {
       return jsonResponse(200, { data: { encrypted: await borrowerEncryptionEnabled(adminClient, workspaceId, localPreview) } });
     }
 
-    if (action === "list") {
+    if (action === "list_metadata") {
       const workspaceId = optionalText(payloadRecord.workspace_id, { maxLen: 36 }) || "all";
       if (workspaceId !== "all" && !UUID_PATTERN.test(workspaceId)) {
         return jsonResponse(400, { error: "Invalid request" });
       }
-      const search = optionalText(payloadRecord.search, { maxLen: 120 });
-
       let query = adminClient
         .from("borrowers")
-        .select("id,workspace_id,encrypted_data,nonce,auth_tag,key_version,created_at")
+        .select("id,workspace_id,access_mode,key_version,created_at,deleted_at")
         .order("created_at", { ascending: false })
         .limit(500);
-
-      if (workspaceId && workspaceId !== "all") {
+      if (workspaceId !== "all") {
         query = query.eq("workspace_id", workspaceId);
       }
       const { data, error } = await query;
+      if (error) {
+        return jsonResponse(400, { error: "Unable to load borrower metadata." });
+      }
+      return jsonResponse(200, { data: data ?? [], payload_mode: "metadata" });
+    }
+
+    if (action === "list") {
+      const workspaceId = optionalText(payloadRecord.workspace_id, { maxLen: 36 }) || "all";
+      if (workspaceId === "all") {
+        return jsonResponse(403, { error: "A single workspace and valid JIT support ticket are required to decrypt borrowers." });
+      }
+      if (!UUID_PATTERN.test(workspaceId)) {
+        return jsonResponse(400, { error: "Invalid request" });
+      }
+      const jitCheck = await requireValidJitTicket({
+        req,
+        adminClient: adminClient as never,
+        actorId: user.id,
+        actorEmail: profile.auth_email ?? user.email ?? null,
+        workspaceId,
+        requiredScope: "read_only",
+        action: "super_borrower_list",
+      });
+      if (!jitCheck.ok) {
+        return jsonResponse(jitCheck.status, { error: jitCheck.error });
+      }
+      const search = optionalText(payloadRecord.search, { maxLen: 120 });
+
+      const { data, error } = await adminClient
+        .from("borrowers")
+        .select("id,workspace_id,encrypted_data,nonce,auth_tag,key_version,created_at")
+        .eq("workspace_id", workspaceId)
+        .order("created_at", { ascending: false })
+        .limit(500);
       if (error) {
         return jsonResponse(400, { error: "Unable to load borrowers." });
       }
       const sourceRows = (data ?? []) as unknown as Array<{
         id: string;
         workspace_id: string;
-        username: string;
-        borrower_id: string;
+        encrypted_data: string | null;
+        nonce: string | null;
+        auth_tag: string | null;
+        key_version: number | null;
         created_at: string;
       }>;
-      const modes = await borrowerEncryptionModes(adminClient, sourceRows.map(row => row.workspace_id), localPreview);
-      const hydrated = await loadLegacyBorrowerFields(sourceRows as unknown as Parameters<typeof loadLegacyBorrowerFields>[0], modes, async ids => {
-        const { data, error } = await adminClient.from("borrowers").select("id,workspace_id,username,borrower_id").in("id", ids);
-        if (error) throw new Error("Borrower data unavailable");
-        return data ?? [];
+      const jitSecret = Deno.env.get("ITX_SGW_JIT_SECRET") ?? "";
+      const decrypted = sourceRows.length
+        ? await decryptSuperBorrowersWithJit(workspaceId, sourceRows, jitSecret, jitCheck.token)
+        : [];
+      const rows = decrypted.map((row, index) => ({ ...row, created_at: sourceRows[index].created_at }));
+      await recordJitTicketUse({
+        req,
+        adminClient: adminClient as never,
+        claims: jitCheck.claims,
+        actorEmail: profile.auth_email ?? user.email ?? null,
+        action: "super_borrower_list",
+        metadata: { decrypted_count: rows.length },
       });
-      const rows = (await resolveMixedSuperBorrowers(hydrated, modes, Deno.env.get("ITX_SGW_INTERNAL_SECRET") ?? "")).map((row, index) => ({ ...row, created_at: sourceRows[index].created_at }));
       if (!search) {
         return jsonResponse(200, { data: rows });
       }
@@ -371,6 +423,18 @@ serve(async (req) => {
 
     if (action === "create") {
       const workspaceId = requireUuid(payloadRecord.workspace_id);
+      const jitCheck = await requireValidJitTicket({
+        req,
+        adminClient: adminClient as never,
+        actorId: user.id,
+        actorEmail: profile.auth_email ?? user.email ?? null,
+        workspaceId,
+        requiredScope: "break_glass",
+        action: "super_borrower_create",
+      });
+      if (!jitCheck.ok) {
+        return jsonResponse(jitCheck.status, { error: jitCheck.error });
+      }
       const encryptedMode = await borrowerEncryptionEnabled(adminClient, workspaceId, localPreview);
       if (encryptedMode) {
         const firstName = requireText(payloadRecord.first_name, { maxLen: 100 });
@@ -380,10 +444,19 @@ serve(async (req) => {
         if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new ValidationError();
         const id = crypto.randomUUID();
         const payload = { first_name: firstName, last_name: lastName || null, borrower_id: borrowerId, email: email || null };
-        const encrypted = await callGateway("encrypt", { workspace_id: workspaceId, id, payload, index_fields: { borrower_id: borrowerId, ...(email ? { email } : {}) } }, Deno.env.get("ITX_SGW_INTERNAL_SECRET") ?? "");
+        const jitSecret = Deno.env.get("ITX_SGW_JIT_SECRET") ?? "";
+        const encrypted = await callJitGateway("encrypt", { workspace_id: workspaceId, id, payload, index_fields: { borrower_id: borrowerId, ...(email ? { email } : {}) } }, jitSecret, jitCheck.token);
         if (typeof encrypted.ciphertext !== "string" || !encrypted.ciphertext || typeof encrypted.nonce !== "string" || !encrypted.nonce || typeof encrypted.auth_tag !== "string" || !encrypted.auth_tag || typeof encrypted.borrower_id_hash !== "string" || !/^[a-f0-9]{64}$/.test(encrypted.borrower_id_hash) || (email && (typeof encrypted.borrower_email_hash !== "string" || !/^[a-f0-9]{64}$/.test(encrypted.borrower_email_hash)))) throw new Error("Gateway unavailable");
-        const { data, error } = await adminClient.rpc("super_create_encrypted_borrower", { p_id: id, p_workspace_id: workspaceId, p_actor_id: user.id, p_encrypted_data: encrypted.ciphertext, p_nonce: encrypted.nonce, p_auth_tag: encrypted.auth_tag, p_borrower_id_hash: encrypted.borrower_id_hash, p_borrower_email_hash: email ? encrypted.borrower_email_hash as string : null });
-        if (error || data !== id) return jsonResponse(error?.code === "23505" ? 409 : 503, { error: error?.code === "23505" ? "Borrower ID already exists." : "Unable to create borrower." });
+        const { data, error } = await adminClient.rpc("super_create_encrypted_borrower_with_jit", { p_ticket_id: jitCheck.claims.tid, p_token_jti: jitCheck.claims.jti, p_id: id, p_workspace_id: workspaceId, p_actor_id: user.id, p_encrypted_data: encrypted.ciphertext, p_nonce: encrypted.nonce, p_auth_tag: encrypted.auth_tag, p_borrower_id_hash: encrypted.borrower_id_hash, p_borrower_email_hash: email ? encrypted.borrower_email_hash as string : null });
+        if (error || data !== id) return jsonResponse(error?.code === "23505" ? 409 : error?.code === "42501" ? 403 : 503, { error: error?.code === "23505" ? "Borrower ID already exists." : error?.code === "42501" ? "Break-glass JIT ticket required." : "Unable to create borrower." });
+        await recordJitTicketUse({
+          req,
+          adminClient: adminClient as never,
+          claims: jitCheck.claims,
+          actorEmail: profile.auth_email ?? user.email ?? null,
+          action: "super_borrower_create",
+          metadata: { borrower_uuid: id },
+        });
         return jsonResponse(200, { data: { id, workspace_id: workspaceId, username: [firstName, lastName].filter(Boolean).join(" "), borrower_id: borrowerId, created_at: new Date().toISOString() } });
       }
       const providedBorrowerId = optionalText(payloadRecord.borrower_id, {
@@ -466,14 +539,42 @@ serve(async (req) => {
       if (error || !data) {
         return jsonResponse(400, { error: "Unable to update borrower." });
       }
-      const source = data as unknown as Parameters<typeof resolveMixedSuperBorrowers>[0][number] & { created_at: string };
-      const modes = await borrowerEncryptionModes(adminClient, [source.workspace_id], localPreview);
-      const hydrated = await loadLegacyBorrowerFields([source], modes, async ids => {
-        const { data, error } = await adminClient.from("borrowers").select("id,workspace_id,username,borrower_id").in("id", ids);
-        if (error) throw new Error("Borrower data unavailable");
-        return data ?? [];
+      const source = data as unknown as {
+        id: string;
+        workspace_id: string;
+        encrypted_data: string | null;
+        nonce: string | null;
+        auth_tag: string | null;
+        key_version: number | null;
+        created_at: string;
+      };
+      const jitCheck = await requireValidJitTicket({
+        req,
+        adminClient: adminClient as never,
+        actorId: user.id,
+        actorEmail: profile.auth_email ?? user.email ?? null,
+        workspaceId: source.workspace_id,
+        requiredScope: "read_only",
+        action: "super_borrower_detail",
       });
-      const [borrower] = await resolveMixedSuperBorrowers(hydrated, modes, Deno.env.get("ITX_SGW_INTERNAL_SECRET") ?? "");
+      if (!jitCheck.ok) {
+        return jsonResponse(jitCheck.status, { error: jitCheck.error });
+      }
+      const jitSecret = Deno.env.get("ITX_SGW_JIT_SECRET") ?? "";
+      const [borrower] = await decryptSuperBorrowersWithJit(
+        source.workspace_id,
+        [source],
+        jitSecret,
+        jitCheck.token,
+      );
+      await recordJitTicketUse({
+        req,
+        adminClient: adminClient as never,
+        claims: jitCheck.claims,
+        actorEmail: profile.auth_email ?? user.email ?? null,
+        action: "super_borrower_detail",
+        metadata: { borrower_uuid: id },
+      });
       return jsonResponse(200, { data: { ...borrower, created_at: source.created_at } });
     }
 
@@ -491,6 +592,22 @@ serve(async (req) => {
         });
       }
 
+      const { data: existing, error: existingError } = await adminClient.from("borrowers").select("id,workspace_id").eq("id", id).maybeSingle();
+      if (existingError || !existing) return jsonResponse(404, { error: "Borrower not found." });
+
+      const jitCheck = await requireValidJitTicket({
+        req,
+        adminClient: adminClient as never,
+        actorId: user.id,
+        actorEmail: profile.auth_email ?? user.email ?? null,
+        workspaceId: existing.workspace_id,
+        requiredScope: "break_glass",
+        action: "super_borrower_delete",
+      });
+      if (!jitCheck.ok) {
+        return jsonResponse(jitCheck.status, { error: jitCheck.error });
+      }
+
       const verified = await verifySuperPassword(
         supabaseUrl,
         publishableKey,
@@ -502,13 +619,19 @@ serve(async (req) => {
         return jsonResponse(403, { error: "Super password verification failed." });
       }
 
-      const { data: existing, error: existingError } = await adminClient.from("borrowers").select("id,workspace_id").eq("id", id).maybeSingle();
-      if (existingError || !existing) return jsonResponse(404, { error: "Borrower not found." });
       const encryptedMode = await borrowerEncryptionEnabled(adminClient, existing.workspace_id, localPreview);
       if (encryptedMode) {
-        const { data, error } = await adminClient.rpc("super_delete_encrypted_borrower", { p_id: id, p_actor_id: user.id });
-        if (error) return jsonResponse(503, { error: "Unable to delete borrower." });
+        const { data, error } = await adminClient.rpc("super_delete_encrypted_borrower_with_jit", { p_ticket_id: jitCheck.claims.tid, p_token_jti: jitCheck.claims.jti, p_id: id, p_workspace_id: existing.workspace_id, p_actor_id: user.id });
+        if (error) return jsonResponse(error.code === "42501" ? 403 : 503, { error: error.code === "42501" ? "Break-glass JIT ticket required." : "Unable to delete borrower." });
         if (!data) return jsonResponse(404, { error: "Borrower not found." });
+        await recordJitTicketUse({
+          req,
+          adminClient: adminClient as never,
+          claims: jitCheck.claims,
+          actorEmail: profile.auth_email ?? user.email ?? null,
+          action: "super_borrower_delete",
+          metadata: { borrower_uuid: id },
+        });
         return jsonResponse(200, { data: { success: true } });
       }
 

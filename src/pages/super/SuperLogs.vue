@@ -8,6 +8,13 @@
       </div>
     </div>
 
+    <SuperJitAccessBar
+      :workspaces="workspaces"
+      :default-workspace-id="workspaceFilter"
+      @ticket-granted="handleJitGranted"
+      @ticket-cleared="handleJitCleared"
+    />
+
     <section class="sa-panel sa-filters">
       <label>Workspace
         <select v-model="workspaceFilter"><option value="all">all workspaces</option><option v-for="t in workspaces" :key="t.id" :value="t.id">{{ t.name }}</option></select>
@@ -63,8 +70,8 @@
                 <td>{{ formatDateTime(row.action_time) }}</td>
                 <td>{{ row.workspace?.name || row.workspace_id }}</td>
                 <td>{{ formatActionLabel(row.action_type) }}</td>
-                <td>{{ row.item?.name || "-" }} ({{ row.item?.barcode || "-" }})</td>
-                <td data-session-replay-mask>{{ row.borrower ? `${row.borrower.username} (${row.borrower.borrower_id})` : "-" }}</td>
+                <td>{{ row.item ? `${row.item.name} (${row.item.barcode})` : "Redacted (JIT required)" }}</td>
+                <td data-session-replay-mask>{{ row.borrower ? `${row.borrower.username} (${row.borrower.borrower_id})` : "Redacted (JIT required)" }}</td>
               </tr>
             </tbody>
           </table>
@@ -83,10 +90,11 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { RouterLink, useRouter } from "vue-router";
 import BoneyardSkeleton from "../../components/BoneyardSkeleton.vue";
 import BoneyardTableFixture from "../../components/BoneyardTableFixture.vue";
+import SuperJitAccessBar from "../../components/SuperJitAccessBar.vue";
 import {
   handleSuperAdminUnauthorized,
   isUnauthorizedError,
@@ -96,8 +104,10 @@ import { listWorkspaces as listWorkspaces, type SuperWorkspace as SuperWorkspace
 import { exportRowsToCsv, exportRowsToPdf } from "../../services/exportService";
 import { toUserFacingErrorMessage } from "../../services/appErrors";
 import { formatActionLabel, ITEM_LOG_ACTION_OPTIONS } from "../../utils/actionLabel";
+import { getActiveJitTokenForWorkspace, useActiveJitSession, type JitTicketScope } from "../../store/jitAccessState";
 
 const router = useRouter();
+const { activeJitSession } = useActiveJitSession();
 const workspaces = ref<SuperWorkspace[]>([]);
 const rows = ref<SuperLogEntry[]>([]);
 const workspaceFilter = ref("all");
@@ -147,6 +157,21 @@ const loadTenants = async () => {
   }
 };
 
+const hasJitReadForFilter = computed(() => {
+  void activeJitSession.value;
+  return workspaceFilter.value !== "all" && Boolean(getActiveJitTokenForWorkspace(workspaceFilter.value, "read_only"));
+});
+
+const handleJitGranted = async (payload: { workspaceId: string; scope: JitTicketScope }) => {
+  workspaceFilter.value = payload.workspaceId;
+  await loadLogs();
+};
+
+const handleJitCleared = async () => {
+  rows.value = [];
+  await loadLogs();
+};
+
 const loadLogs = async () => {
   isLoading.value = true;
   error.value = "";
@@ -159,6 +184,7 @@ const loadLogs = async () => {
       end_at: endAt.value ? new Date(endAt.value).toISOString() : undefined,
       page: page.value,
       page_size: pageSize.value,
+      include_payload: hasJitReadForFilter.value,
     });
     rows.value = result.rows;
   } catch (err) {

@@ -77,6 +77,12 @@ export const sanitizeRequestHeaders = (
   } else if (resolvedAuth) {
     headers.set("Authorization", resolvedAuth);
   }
+  if (functionName.startsWith("super-")) {
+    const jitTicket = request.headers.get("x-itx-jit-ticket")?.trim();
+    if (jitTicket && jitTicket.length <= 4096) {
+      headers.set("x-itx-jit-ticket", jitTicket);
+    }
+  }
   const clientInfo = request.headers.get("x-client-info");
   if (clientInfo) headers.set("x-client-info", clientInfo);
   const userAgent = request.headers.get("user-agent");

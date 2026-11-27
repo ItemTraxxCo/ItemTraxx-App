@@ -679,6 +679,49 @@ const superOpsRequestSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("preview_subprocessor_notice"), payload: subprocessorNoticePayloadSchema }),
   z.object({ action: z.literal("announce_subprocessor_change"), payload: subprocessorNoticePayloadSchema }),
   z.object({ action: z.literal("list_subprocessor_notices"), payload: z.object({}).optional() }),
+  z.object({
+    action: z.literal("request_jit_ticket"),
+    payload: z.object({
+      workspace_id: z.string().uuid(),
+      reason: z.string().min(3).max(1000),
+      external_ticket_id: z.string().min(1).max(128),
+      ttl_minutes: z.number().int().min(1).max(60).optional(),
+    }),
+  }),
+  z.object({
+    action: z.literal("invoke_break_glass"),
+    payload: z.object({
+      workspace_id: z.string().uuid(),
+      justification: z.string().min(10).max(2000),
+      acknowledged_by: z.string().min(2).max(256),
+      incident_id: z.string().max(128).nullable().optional(),
+      external_ticket_id: z.string().max(128).nullable().optional(),
+      ttl_minutes: z.number().int().min(1).max(60).optional(),
+    }),
+  }),
+  z.object({
+    action: z.literal("revoke_jit_ticket"),
+    payload: z.object({
+      ticket_id: z.string().uuid(),
+      reason: z.string().max(500).optional(),
+    }),
+  }),
+  z.object({
+    action: z.literal("list_jit_tickets"),
+    payload: z.object({
+      workspace_id: z.string().optional(),
+      status: z.enum(["all", "active", "revoked", "expired"]).optional(),
+      limit: z.number().int().min(1).max(100).optional(),
+    }).optional(),
+  }),
+  z.object({
+    action: z.literal("list_jit_audit_logs"),
+    payload: z.object({
+      workspace_id: z.string().optional(),
+      ticket_id: z.string().uuid().optional(),
+      limit: z.number().int().min(1).max(100).optional(),
+    }).optional(),
+  }),
 ]);
 
 const superOpsResponseSchemas = {
@@ -736,6 +779,58 @@ const superOpsResponseSchemas = {
   list_subprocessor_notices: superOpsDirectResponseSchema(
     z.object({ notices: z.array(subprocessorNoticeSchema) }),
   ),
+  request_jit_ticket: superOpsEnvelopeSchema(z.object({
+    ticket: z.object({
+      id: z.string().uuid(),
+      admin_user_id: z.string().uuid(),
+      workspace_id: z.string().uuid(),
+      scope: z.enum(["read_only", "break_glass"]),
+      status: z.string(),
+      reason: z.string(),
+      external_ticket_id: z.string().nullable(),
+      ttl_minutes: z.number().int(),
+      issued_at: z.string(),
+      expires_at: z.string(),
+    }),
+    token: z.string(),
+  })),
+  invoke_break_glass: superOpsEnvelopeSchema(z.object({
+    ticket: z.object({
+      id: z.string().uuid(),
+      admin_user_id: z.string().uuid(),
+      workspace_id: z.string().uuid(),
+      scope: z.literal("break_glass"),
+      status: z.string(),
+      reason: z.string(),
+      external_ticket_id: z.string().nullable(),
+      ttl_minutes: z.number().int(),
+      issued_at: z.string(),
+      expires_at: z.string(),
+    }),
+    break_glass_event_id: z.string().uuid(),
+    alert_delivery: z.object({
+      status: z.enum(["delivered", "partial", "failed"]),
+      attempted_channels: z.array(z.string()),
+      delivered_channels: z.array(z.string()),
+      queued_retries: z.number().int().nonnegative(),
+    }),
+    token: z.string(),
+  })),
+  revoke_jit_ticket: superOpsEnvelopeSchema(z.object({
+    ticket: z.object({
+      id: z.string().uuid(),
+      workspace_id: z.string().uuid(),
+      scope: z.enum(["read_only", "break_glass"]),
+      status: z.string(),
+      revoked_at: z.string(),
+    }),
+  })),
+  list_jit_tickets: superOpsEnvelopeSchema(z.object({
+    tickets: z.array(z.record(z.string(), z.unknown())),
+  })),
+  list_jit_audit_logs: superOpsEnvelopeSchema(z.object({
+    logs: z.array(z.record(z.string(), z.unknown())),
+  })),
 };
 
 const superWorkspaceAdminSchema = z.object({

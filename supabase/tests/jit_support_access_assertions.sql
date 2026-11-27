@@ -219,6 +219,8 @@ begin
   end;
 
   -- Workspace deletion must succeed even while immutable jit_audit_log references its UUID.
+  -- Delete dependent workspace profile first (matching purge_workspace order).
+  delete from public.profiles where id = '91a10200-0000-4000-8000-000000000011';
   delete from public.workspaces where id = '91a10200-0000-4000-8000-000000000001';
   if not exists (select 1 from public.jit_audit_log where id = audit_id) then
     raise exception 'jit_audit_log row disappeared after workspace delete';

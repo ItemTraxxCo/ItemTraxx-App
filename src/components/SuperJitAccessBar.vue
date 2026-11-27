@@ -54,7 +54,12 @@
       </div>
     </div>
 
-    <p v-if="errorMessage" class="sa-error">{{ errorMessage }}</p>
+    <div v-if="errorMessage && !modalMode" class="sa-error jit-error-banner" role="alert">
+      <span>{{ errorMessage }}</span>
+      <RouterLink v-if="needsStepUpReverify" :to="reverifyRoute" class="sa-btn jit-reverify-link">
+        Re-verify Super Admin
+      </RouterLink>
+    </div>
 
     <div v-if="modalMode" class="jit-modal-backdrop" role="dialog" aria-modal="true">
       <div class="jit-modal">
@@ -66,6 +71,12 @@
               : 'Grants temporary read-only access to one workspace. Mutations remain blocked.'
           }}
         </p>
+        <div v-if="errorMessage" class="sa-error jit-error-banner" role="alert">
+          <span>{{ errorMessage }}</span>
+          <RouterLink v-if="needsStepUpReverify" :to="reverifyRoute" class="sa-btn jit-reverify-link">
+            Re-verify Super Admin
+          </RouterLink>
+        </div>
         <form class="form" @submit.prevent="handleSubmit">
           <label>
             Target Workspace
@@ -127,6 +138,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from "vue";
+import { RouterLink, useRoute } from "vue-router";
 import {
   invokeBreakGlassAccess,
   requestJitSupportTicket,
@@ -149,6 +161,7 @@ const emit = defineEmits<{
   (event: "ticket-cleared"): void;
 }>();
 
+const route = useRoute();
 const { activeJitSession } = useActiveJitSession();
 const modalMode = ref<null | JitTicketScope>(null);
 const selectedWorkspaceId = ref("");
@@ -160,6 +173,28 @@ const acknowledgedBy = ref("");
 const incidentId = ref("");
 const isSubmitting = ref(false);
 const errorMessage = ref("");
+const needsStepUpReverify = ref(false);
+const reverifyRoute = computed(() =>
+  route?.path?.startsWith("/internal") ||
+    (typeof window !== "undefined" && window.location.hostname === "internal.itemtraxx.com")
+    ? "/auth"
+    : "/super-auth",
+);
+
+const applyJitError = (err: unknown, fallback: string) => {
+  const raw = err instanceof Error ? err.message : "";
+  if (/super admin verification required|confirm your current password/i.test(raw)) {
+    needsStepUpReverify.value = true;
+    errorMessage.value = "Super admin verification expired (5-minute window). Re-verify to issue a JIT ticket.";
+    return;
+  }
+  needsStepUpReverify.value = false;
+  if (/break-glass blocked/i.test(raw)) {
+    errorMessage.value = raw;
+    return;
+  }
+  errorMessage.value = toUserFacingErrorMessage(err, fallback);
+};
 const nowMs = ref(Date.now());
 let tickTimer: ReturnType<typeof setInterval> | null = null;
 let unsubscribeCleared: (() => void) | null = null;
@@ -179,6 +214,7 @@ const remainingLabel = computed(() => {
 
 const openModal = (mode: JitTicketScope) => {
   errorMessage.value = "";
+  needsStepUpReverify.value = false;
   modalMode.value = mode;
   selectedWorkspaceId.value = props.defaultWorkspaceId && props.defaultWorkspaceId !== "all"
     ? props.defaultWorkspaceId
@@ -189,12 +225,14 @@ const openModal = (mode: JitTicketScope) => {
 const closeModal = () => {
   modalMode.value = null;
   errorMessage.value = "";
+  needsStepUpReverify.value = false;
 };
 
 const handleSubmit = async () => {
   if (!modalMode.value || !selectedWorkspaceId.value) return;
   isSubmitting.value = true;
   errorMessage.value = "";
+  needsStepUpReverify.value = false;
   try {
     if (modalMode.value === "read_only") {
       const res = await requestJitSupportTicket({
@@ -230,7 +268,7 @@ const handleSubmit = async () => {
       });
     }
   } catch (err) {
-    errorMessage.value = toUserFacingErrorMessage(err, "Unable to obtain JIT ticket.");
+    applyJitError(err, "Unable to obtain JIT ticket.");
   } finally {
     isSubmitting.value = false;
   }
@@ -241,11 +279,12 @@ const handleRevoke = async () => {
   if (!session) return;
   isSubmitting.value = true;
   errorMessage.value = "";
+  needsStepUpReverify.value = false;
   try {
     await revokeJitSupportTicket(session.ticket.id, "Manual super-admin revocation");
     emit("ticket-cleared");
   } catch (err) {
-    errorMessage.value = toUserFacingErrorMessage(err, "Unable to revoke JIT ticket.");
+    applyJitError(err, "Unable to revoke JIT ticket.");
   } finally {
     isSubmitting.value = false;
   }
@@ -295,5 +334,16 @@ onUnmounted(() => {
   width: 100%;
   padding: 1.5rem;
   box-shadow: 0 12px 36px rgba(15, 23, 42, 0.25);
+}
+.jit-error-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin: 0.75rem 0;
+}
+.jit-reverify-link {
+  white-space: nowrap;
 }
 </style>

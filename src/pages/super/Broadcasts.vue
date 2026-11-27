@@ -88,6 +88,10 @@
           <button type="button" class="sa-btn" :disabled="isSaving" @click="clearWorkspaceUpdates">Clear Updates</button>
         </div>
       </form>
+      <p class="form-meta">
+        {{ activeUpdates.length }} active update{{ activeUpdates.length === 1 ? "" : "s" }} (newest
+        {{ MAX_WORKSPACE_UPDATES }} are kept; publishing adds to the list).
+      </p>
     </section>
 
     <div v-if="toastMessage" class="toast">
@@ -114,6 +118,8 @@ const updateTitle = ref("");
 const updateMessage = ref("");
 const updateLevel = ref<"info" | "warning" | "critical">("info");
 const updateLinkUrl = ref("");
+const MAX_WORKSPACE_UPDATES = 5;
+const activeUpdates = ref<Array<Record<string, unknown>>>([]);
 let toastTimer: number | null = null;
 
 const showToast = (title: string, body: string) => {
@@ -144,6 +150,13 @@ const loadCurrent = async () => {
       raw.level === "warning" || raw.level === "critical" ? raw.level : "info";
     enabled.value = raw.enabled === true;
     lastUpdated.value = typeof raw.updated_at === "string" ? raw.updated_at : "";
+    const rawUpdates = (data.runtime_config?.workspace_updates ?? {}) as Record<string, unknown>;
+    activeUpdates.value =
+      rawUpdates.enabled !== false && Array.isArray(rawUpdates.items)
+        ? rawUpdates.items.filter(
+            (item): item is Record<string, unknown> => !!item && typeof item === "object"
+          )
+        : [];
   } catch (err) {
     showToast("Load failed", toUserFacingErrorMessage(err, "Unable to load broadcast settings."));
   }
@@ -206,27 +219,37 @@ const saveWorkspaceUpdate = async () => {
     showToast("Invalid input", "Enter an update message.");
     return;
   }
+  const linkUrl = updateLinkUrl.value.trim();
+  if (linkUrl && !/^https:\/\/\S+$/i.test(linkUrl)) {
+    showToast("Invalid input", "Links must start with https://.");
+    return;
+  }
 
   isSaving.value = true;
   try {
     const nowIso = new Date().toISOString();
+    // Prepend instead of replacing so earlier updates stay visible to
+    // workspaces until they age out of the list or are cleared.
+    const items = [
+      {
+        id: crypto.randomUUID(),
+        title: updateTitle.value.trim() || "Product update",
+        message: updateMessage.value.trim(),
+        level: updateLevel.value,
+        link_url: linkUrl || null,
+        created_at: nowIso,
+      },
+      ...activeUpdates.value,
+    ].slice(0, MAX_WORKSPACE_UPDATES);
     await setRuntimeConfig({
       key: "workspace_updates",
       value: {
         enabled: true,
-        items: [
-          {
-            id: nowIso,
-            title: updateTitle.value.trim() || "Product update",
-            message: updateMessage.value.trim(),
-            level: updateLevel.value,
-            link_url: updateLinkUrl.value.trim() || null,
-            created_at: nowIso,
-          },
-        ],
+        items,
         updated_at: nowIso,
       },
     });
+    activeUpdates.value = items;
     showToast("Published", "Tenant notification update published.");
     updateTitle.value = "";
     updateMessage.value = "";
@@ -250,6 +273,7 @@ const clearWorkspaceUpdates = async () => {
         updated_at: new Date().toISOString(),
       },
     });
+    activeUpdates.value = [];
     showToast("Cleared", "Tenant notification updates cleared.");
   } catch (err) {
     showToast("Action failed", toUserFacingErrorMessage(err, "Unable to clear workspace updates."));

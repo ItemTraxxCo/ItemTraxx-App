@@ -48,6 +48,16 @@
           <input v-model="dateTo" type="date" />
         </label>
       </div>
+      <p
+        v-if="focusedItemId && !isLoading && !loadError"
+        class="focus-note"
+        :class="{ 'is-fading': isHighlightFading }"
+        role="status"
+      >
+        <span v-if="focusedItemName">Showing <strong>{{ focusedItemName }}</strong>.</span>
+        <span v-else>The selected item no longer has status activity to show.</span>
+        <RouterLink :to="{ path: route.path }">Show all items</RouterLink>
+      </p>
       <p v-if="isLoading" class="muted">Loading status tracking...</p>
       <div v-else class="table-wrap">
       <table class="table">
@@ -61,7 +71,12 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="item in filteredFlaggedItems" :key="item.id">
+          <tr
+            v-for="item in filteredFlaggedItems"
+            :key="item.id"
+            :class="{ 'row-focused': item.id === focusedItemId, 'row-fading': isHighlightFading }"
+            :data-focus-row="item.id === focusedItemId ? 'true' : undefined"
+          >
             <td>{{ item.name }}</td>
             <td>{{ item.barcode }}</td>
             <td>{{ formatItemStatus(item.status) }}</td>
@@ -106,7 +121,12 @@
           <tr v-if="isLoading">
             <td colspan="4" class="muted" role="status">Loading status history...</td>
           </tr>
-          <tr v-for="event in filteredHistory" :key="event.id">
+          <tr
+            v-for="event in filteredHistory"
+            :key="event.id"
+            :class="{ 'row-focused': event.item_id === focusedItemId, 'row-fading': isHighlightFading }"
+            :data-focus-row="event.item_id === focusedItemId ? 'true' : undefined"
+          >
             <td>{{ formatDate(event.changed_at) }}</td>
             <td>{{ event.item?.name || "-" }} ({{ event.item?.barcode || "-" }})</td>
             <td>{{ formatItemStatus(event.status) }}</td>
@@ -131,8 +151,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from "vue";
-import { RouterLink } from "vue-router";
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
+import { RouterLink, useRoute, useRouter } from "vue-router";
 import {
   fetchWorkspaceSettings,
   fetchStatusTracking,
@@ -145,6 +165,8 @@ import { useManagerContext } from "../../../composables/useManagerContext";
 import { formatItemStatus, ITEM_STATUS_OPTIONS } from "../../../utils/itemStatus";
 
 const { managerRoot } = useManagerContext();
+const route = useRoute();
+const router = useRouter();
 
 const flaggedItems = ref<StatusTrackedItem[]>([]);
 const history = ref<StatusHistoryItem[]>([]);
@@ -159,6 +181,58 @@ const dateFrom = ref("");
 const dateTo = ref("");
 const featureEnabled = ref(true);
 let toastTimer: number | null = null;
+
+// Notification links deep-link here with ?item=<id>; that item's rows are
+// highlighted and scrolled into view.
+const focusedItemId = computed(() =>
+  typeof route.query.item === "string" && route.query.item ? route.query.item : null
+);
+
+const focusedItemName = computed(() => {
+  const id = focusedItemId.value;
+  if (!id) return "";
+  const flagged = flaggedItems.value.find((item) => item.id === id);
+  if (flagged) return flagged.name;
+  return history.value.find((event) => event.item_id === id)?.item?.name ?? "";
+});
+
+// The deep-link highlight stays for HIGHLIGHT_VISIBLE_MS, fades out over
+// HIGHLIGHT_FADE_MS, then ?item= is dropped so a reload doesn't bring it back.
+const HIGHLIGHT_VISIBLE_MS = 4000;
+const HIGHLIGHT_FADE_MS = 600;
+const isHighlightFading = ref(false);
+let highlightFadeTimer: number | null = null;
+let highlightClearTimer: number | null = null;
+
+const clearHighlightTimers = () => {
+  if (highlightFadeTimer) window.clearTimeout(highlightFadeTimer);
+  if (highlightClearTimer) window.clearTimeout(highlightClearTimer);
+  highlightFadeTimer = null;
+  highlightClearTimer = null;
+};
+
+const scheduleHighlightFade = () => {
+  clearHighlightTimers();
+  isHighlightFading.value = false;
+  if (!focusedItemId.value) return;
+  highlightFadeTimer = window.setTimeout(() => {
+    highlightFadeTimer = null;
+    isHighlightFading.value = true;
+    highlightClearTimer = window.setTimeout(() => {
+      highlightClearTimer = null;
+      const { item: _item, ...rest } = route.query;
+      void router.replace({ path: route.path, query: rest, hash: route.hash });
+    }, HIGHLIGHT_FADE_MS);
+  }, HIGHLIGHT_VISIBLE_MS);
+};
+
+const scrollToFocusedRow = async () => {
+  if (!focusedItemId.value) return;
+  scheduleHighlightFade();
+  await nextTick();
+  const row = document.querySelector<HTMLElement>('[data-focus-row="true"]');
+  row?.scrollIntoView({ block: "center", behavior: "smooth" });
+};
 
 const latestStatusChangeAt = computed(() => {
   const latestByItem = new Map<string, string>();
@@ -256,6 +330,7 @@ const loadStatusTracking = async () => {
     const payload = await fetchStatusTracking();
     flaggedItems.value = payload.flagged_items;
     history.value = payload.history;
+    void scrollToFocusedRow();
   } catch (err) {
     loadError.value = toUserFacingErrorMessage(err, "Unable to load status tracking.");
     showToast("Load failed", loadError.value);
@@ -338,10 +413,60 @@ onMounted(() => {
   })();
 });
 
+watch(focusedItemId, (itemId) => {
+  if (!itemId) {
+    clearHighlightTimers();
+    isHighlightFading.value = false;
+    return;
+  }
+  // Clear filters so a stale search can't hide the item the user asked for.
+  searchQuery.value = "";
+  statusFilter.value = "all";
+  dateFrom.value = "";
+  dateTo.value = "";
+  if (!isLoading.value) void scrollToFocusedRow();
+});
+
 onUnmounted(() => {
+  clearHighlightTimers();
   if (toastTimer) {
     window.clearTimeout(toastTimer);
     toastTimer = null;
   }
 });
 </script>
+
+<style scoped>
+.focus-note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 0.75rem;
+  font-size: 0.9rem;
+}
+
+.focus-note {
+  transition: opacity 600ms ease;
+}
+
+.focus-note.is-fading {
+  opacity: 0;
+}
+
+.row-focused td {
+  background-color: rgba(245, 158, 11, 0.14);
+  transition: background-color 600ms ease;
+}
+
+.row-focused.row-fading td {
+  background-color: rgba(245, 158, 11, 0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .focus-note,
+  .row-focused td {
+    transition: none;
+  }
+}
+</style>

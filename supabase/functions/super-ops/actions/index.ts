@@ -5,6 +5,7 @@ import { handleSalesCustomersAction } from "./salesCustomers.ts";
 import { handleSecuritySessionsAction } from "./securitySessions.ts";
 import { handleSupportAction } from "./support.ts";
 import { handleSubprocessorsAction } from "./subprocessors.ts";
+import { handleJitAccessAction } from "./jitAccess.ts";
 
 export const SUPER_OPS_ACTIONS = [
   "verify_password",
@@ -37,6 +38,11 @@ export const SUPER_OPS_ACTIONS = [
   "preview_subprocessor_notice",
   "announce_subprocessor_change",
   "list_subprocessor_notices",
+  "request_jit_ticket",
+  "invoke_break_glass",
+  "revoke_jit_ticket",
+  "list_jit_tickets",
+  "list_jit_audit_logs",
 ] as const;
 
 export const dispatchSuperOpsAction = async (
@@ -50,6 +56,7 @@ export const dispatchSuperOpsAction = async (
       handleSalesCustomersAction,
       handleInternalOpsAction,
       handleSubprocessorsAction,
+      handleJitAccessAction,
     ]
   ) {
     const response = await handler(context);

@@ -13,6 +13,10 @@ import { resolveCorsHeaders } from "../_shared/cors.ts";
 import { readJsonBody } from "../_shared/requestBody.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 import {
+  recordJitTicketUse,
+  requireValidJitTicket,
+} from "../_shared/jitTicket.ts";
+import {
   BARCODE_PATTERN,
   optionalText,
   requireEnum,
@@ -24,7 +28,7 @@ import {
 
 const baseCorsHeaders = {
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-request-id",
+    "authorization, x-client-info, apikey, content-type, x-request-id, x-itx-jit-ticket",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   Vary: "Origin",
 };
@@ -189,23 +193,54 @@ serve(async (req) => {
     }
     const payloadRecord = payload as Record<string, unknown>;
 
-    if (action === "list") {
+    if (action === "list_metadata") {
       const workspaceId = optionalText(payloadRecord.workspace_id, { maxLen: 36 }) || "all";
       if (workspaceId !== "all" && !UUID_PATTERN.test(workspaceId)) {
         return jsonResponse(400, { error: "Invalid request" });
       }
-      const search = optionalText(payloadRecord.search, { maxLen: 120 });
-
       let query = adminClient
         .from("items")
-        .select("id, workspace_id, name, barcode, serial_number, status, notes")
+        .select("id, workspace_id, status, created_at")
         .order("created_at", { ascending: false })
         .limit(500);
-
-      if (workspaceId && workspaceId !== "all") {
+      if (workspaceId !== "all") {
         query = query.eq("workspace_id", workspaceId);
       }
       const { data, error } = await query;
+      if (error) {
+        return jsonResponse(400, { error: "Unable to load item metadata." });
+      }
+      return jsonResponse(200, { data: data ?? [], payload_mode: "metadata" });
+    }
+
+    if (action === "list") {
+      const workspaceId = optionalText(payloadRecord.workspace_id, { maxLen: 36 }) || "all";
+      if (workspaceId === "all") {
+        return jsonResponse(403, { error: "A single workspace and valid JIT support ticket are required to view tenant items." });
+      }
+      if (!UUID_PATTERN.test(workspaceId)) {
+        return jsonResponse(400, { error: "Invalid request" });
+      }
+      const jitCheck = await requireValidJitTicket({
+        req,
+        adminClient,
+        actorId: user.id,
+        actorEmail: profile.auth_email ?? user.email ?? null,
+        workspaceId,
+        requiredScope: "read_only",
+        action: "super_item_list",
+      });
+      if (!jitCheck.ok) {
+        return jsonResponse(jitCheck.status, { error: jitCheck.error });
+      }
+      const search = optionalText(payloadRecord.search, { maxLen: 120 });
+
+      const { data, error } = await adminClient
+        .from("items")
+        .select("id, workspace_id, name, barcode, serial_number, status, notes")
+        .eq("workspace_id", workspaceId)
+        .order("created_at", { ascending: false })
+        .limit(500);
       if (error) {
         return jsonResponse(400, { error: "Unable to load items." });
       }
@@ -218,6 +253,14 @@ serve(async (req) => {
         status: string;
         notes: string | null;
       }>;
+      await recordJitTicketUse({
+        req,
+        adminClient,
+        claims: jitCheck.claims,
+        actorEmail: profile.auth_email ?? user.email ?? null,
+        action: "super_item_list",
+        metadata: { item_count: rows.length },
+      });
       if (!search) {
         return jsonResponse(200, { data: rows });
       }
@@ -236,6 +279,18 @@ serve(async (req) => {
 
     if (action === "create") {
       const workspaceId = requireUuid(payloadRecord.workspace_id);
+      const jitCheck = await requireValidJitTicket({
+        req,
+        adminClient,
+        actorId: user.id,
+        actorEmail: profile.auth_email ?? user.email ?? null,
+        workspaceId,
+        requiredScope: "break_glass",
+        action: "super_item_create",
+      });
+      if (!jitCheck.ok) {
+        return jsonResponse(jitCheck.status, { error: jitCheck.error });
+      }
       const name = requireText(payloadRecord.name, { maxLen: 120 });
       const barcode = requireText(payloadRecord.barcode, { maxLen: 64, pattern: BARCODE_PATTERN });
       const serial = optionalText(payloadRecord.serial_number, { maxLen: 64 });
@@ -269,11 +324,39 @@ serve(async (req) => {
           barcode: data.barcode,
         },
       });
+      await recordJitTicketUse({
+        req,
+        adminClient,
+        claims: jitCheck.claims,
+        actorEmail: profile.auth_email ?? user.email ?? null,
+        action: "super_item_create",
+        metadata: { item_id: data.id },
+      });
       return jsonResponse(200, { data });
     }
 
     if (action === "update") {
       const id = requireUuid(payloadRecord.id);
+      const { data: existingItem, error: existingItemError } = await adminClient
+        .from("items")
+        .select("id, workspace_id")
+        .eq("id", id)
+        .maybeSingle();
+      if (existingItemError || !existingItem) {
+        return jsonResponse(404, { error: "Item not found." });
+      }
+      const jitCheck = await requireValidJitTicket({
+        req,
+        adminClient,
+        actorId: user.id,
+        actorEmail: profile.auth_email ?? user.email ?? null,
+        workspaceId: existingItem.workspace_id,
+        requiredScope: "break_glass",
+        action: "super_item_update",
+      });
+      if (!jitCheck.ok) {
+        return jsonResponse(jitCheck.status, { error: jitCheck.error });
+      }
       const name = requireText(payloadRecord.name, { maxLen: 120 });
       const barcode = requireText(payloadRecord.barcode, { maxLen: 64, pattern: BARCODE_PATTERN });
       const status = requireEnum(payloadRecord.status, ALLOWED_ITEM_STATUSES);
@@ -330,6 +413,14 @@ serve(async (req) => {
           status: data.status,
         },
       });
+      await recordJitTicketUse({
+        req,
+        adminClient,
+        claims: jitCheck.claims,
+        actorEmail: profile.auth_email ?? user.email ?? null,
+        action: "super_item_update",
+        metadata: { item_id: data.id, status: data.status },
+      });
       return jsonResponse(200, { data });
     }
 
@@ -347,6 +438,27 @@ serve(async (req) => {
         });
       }
 
+      const { data: target, error: targetError } = await adminClient
+        .from("items")
+        .select("id, workspace_id, barcode")
+        .eq("id", id)
+        .maybeSingle();
+      if (targetError || !target) {
+        return jsonResponse(404, { error: "Item not found." });
+      }
+      const jitCheck = await requireValidJitTicket({
+        req,
+        adminClient,
+        actorId: user.id,
+        actorEmail: profile.auth_email ?? user.email ?? null,
+        workspaceId: target.workspace_id,
+        requiredScope: "break_glass",
+        action: "super_item_delete",
+      });
+      if (!jitCheck.ok) {
+        return jsonResponse(jitCheck.status, { error: jitCheck.error });
+      }
+
       const verified = await verifySuperPassword(
         supabaseUrl,
         publishableKey,
@@ -356,15 +468,6 @@ serve(async (req) => {
       );
       if (!verified) {
         return jsonResponse(403, { error: "Super password verification failed." });
-      }
-
-      const { data: target, error: targetError } = await adminClient
-        .from("items")
-        .select("id, workspace_id, barcode")
-        .eq("id", id)
-        .maybeSingle();
-      if (targetError || !target) {
-        return jsonResponse(404, { error: "Item not found." });
       }
 
       const { error } = await adminClient.from("items").delete().eq("id", id);
@@ -381,6 +484,14 @@ serve(async (req) => {
           workspace_id: target.workspace_id,
           barcode: target.barcode,
         },
+      });
+      await recordJitTicketUse({
+        req,
+        adminClient,
+        claims: jitCheck.claims,
+        actorEmail: profile.auth_email ?? user.email ?? null,
+        action: "super_item_delete",
+        metadata: { item_id: id },
       });
       return jsonResponse(200, { data: { success: true } });
     }

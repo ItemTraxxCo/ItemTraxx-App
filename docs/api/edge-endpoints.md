@@ -436,10 +436,43 @@ Super-admin operational controls, approvals, customer ops, and reporting.
 
 - No additional fields.
 
+#### `request_jit_ticket`
+
+- `workspace_id` (required): string
+- `reason` (required): string
+- `external_ticket_id` (required): string
+- `ttl_minutes`: integer
+
+#### `invoke_break_glass`
+
+- `workspace_id` (required): string
+- `justification` (required): string
+- `acknowledged_by` (required): string
+- `incident_id`: any
+- `external_ticket_id`: any
+- `ttl_minutes`: integer
+
+#### `revoke_jit_ticket`
+
+- `ticket_id` (required): string
+- `reason`: string
+
+#### `list_jit_tickets`
+
+- `workspace_id`: string
+- `status`: string
+- `limit`: integer
+
+#### `list_jit_audit_logs`
+
+- `workspace_id`: string
+- `ticket_id`: string
+- `limit`: integer
+
 ### Response schema
 
 - Schema: `superOpsResponses`
-- Top-level keys: `verify_password`, `touch_session`, `list_sessions`, `list_passkeys`, `start_passkey_registration`, `verify_passkey_registration`, `delete_passkey`, `revoke_session`, `revoke_all_sessions`, `get_control_center`, `set_runtime_config`, `upsert_alert_rule`, `set_workspace_policy`, `set_workspace_force_reauth`, `create_approval`, `approve_request`, `list_support_requests`, `get_support_request`, `update_support_request`, `list_sales_leads`, `close_sales_lead`, `move_sales_lead_to_customer`, `set_sales_lead_stage`, `delete_sales_lead`, `list_customers`, `add_customer_status_entry`, `get_internal_ops_snapshot`, `preview_subprocessor_notice`, `announce_subprocessor_change`, `list_subprocessor_notices`
+- Top-level keys: `verify_password`, `touch_session`, `list_sessions`, `list_passkeys`, `start_passkey_registration`, `verify_passkey_registration`, `delete_passkey`, `revoke_session`, `revoke_all_sessions`, `get_control_center`, `set_runtime_config`, `upsert_alert_rule`, `set_workspace_policy`, `set_workspace_force_reauth`, `create_approval`, `approve_request`, `list_support_requests`, `get_support_request`, `update_support_request`, `list_sales_leads`, `close_sales_lead`, `move_sales_lead_to_customer`, `set_sales_lead_stage`, `delete_sales_lead`, `list_customers`, `add_customer_status_entry`, `get_internal_ops_snapshot`, `preview_subprocessor_notice`, `announce_subprocessor_change`, `list_subprocessor_notices`, `request_jit_ticket`, `invoke_break_glass`, `revoke_jit_ticket`, `list_jit_tickets`, `list_jit_audit_logs`
 
 ## `POST /functions/v1/workspace-admin-mutate`
 

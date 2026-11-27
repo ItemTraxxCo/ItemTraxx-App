@@ -236,3 +236,79 @@ test('coordinator local HTTP override is restricted to explicit loopback develop
   assert.equal(coordinatorUrl({ SUPABASE_URL: 'http://127.0.0.1:54321', SGW_LOCAL_DEV: 'true' }), 'http://127.0.0.1:54321/rest/v1/rpc/sgw_key_lifecycle_transition');
   assert.throws(() => coordinatorUrl({ SUPABASE_URL: 'http://evil.test', SGW_LOCAL_DEV: 'true' }));
 });
+
+async function signTestJitToken(claims, privateKey) {
+  const encodeB64Url = (obj) => btoa(JSON.stringify(obj)).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
+  const header = encodeB64Url({ alg: 'ES256', typ: 'itx-jit+jwt' });
+  const payload = encodeB64Url({ iss: 'itemtraxx-jit', aud: 'itemtraxx-sgw', ...claims });
+  const sig = new Uint8Array(await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, privateKey, new TextEncoder().encode(`${header}.${payload}`)));
+  const sigB64 = btoa(String.fromCharCode(...sig)).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
+  return `${header}.${payload}.${sigB64}`;
+}
+
+test('JIT gateway routes enforce signed ticket, expiry at T+1s, workspace binding, scope, and DB revocation', async () => {
+  const pair = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']);
+  const publicJwk = JSON.stringify(await crypto.subtle.exportKey('jwk', pair.publicKey));
+  const jitSecret = 'c'.repeat(64);
+  store.set(workspace, JSON.stringify(await generateWorkspaceKeys(key, workspace)));
+  const jitEnv = { ...env, KMS_JIT_SECRET: jitSecret, ITX_JIT_TICKET_PUBLIC_JWK: publicJwk };
+
+  const encrypted = await (await call('/v1/crypto/encrypt', { workspace_id: workspace, id, payload: { first_name: 'Maya', borrower_id: 'B100' } })).json();
+  const iat = 1_700_000_000;
+  const exp = iat + 900;
+  const baseClaims = {
+    jti: crypto.randomUUID(),
+    tid: crypto.randomUUID(),
+    sub: crypto.randomUUID(),
+    ws: workspace,
+    rsn: 'SUP-77',
+    iat,
+    exp,
+  };
+  const readOnlyToken = await signTestJitToken({ ...baseClaims, scope: 'read_only' }, pair.privateKey);
+  const breakGlassToken = await signTestJitToken({ ...baseClaims, jti: crypto.randomUUID(), tid: crypto.randomUUID(), scope: 'break_glass' }, pair.privateKey);
+
+  const jitReq = (path, body, token) => new Request(`https://sgw.itemtraxx.com${path}`, {
+    method: 'POST',
+    headers: {
+      authorization: `Bearer ${jitSecret}`,
+      'content-type': 'application/json',
+      ...(token ? { 'x-itx-jit-ticket': token } : {}),
+    },
+    body: JSON.stringify(body),
+  });
+
+  // Missing ticket -> 403 before touching KV
+  let kvTouched = false;
+  const noTouchEnv = { ...jitEnv, KEYS: { get: async () => { kvTouched = true; return null; } } };
+  const missing = await handleRequest(jitReq('/v1/crypto/jit/decrypt', { workspace_id: workspace, items: [{ id, ...encrypted }] }, null), noTouchEnv, async () => true, async () => true, (iat + 10) * 1000);
+  assert.equal(missing.status, 403);
+  assert.equal(kvTouched, false);
+
+  // Valid read_only ticket decrypts before expiry
+  const decrypted = await handleRequest(jitReq('/v1/crypto/jit/decrypt', { workspace_id: workspace, items: [{ id, ...encrypted }] }, readOnlyToken), jitEnv, async () => true, async () => true, (exp - 1) * 1000);
+  assert.equal(decrypted.status, 200);
+  assert.deepEqual((await decrypted.json()).items[0].payload, { first_name: 'Maya', borrower_id: 'B100' });
+
+  // Expired at T and T+1s -> 403
+  const atExpiry = await handleRequest(jitReq('/v1/crypto/jit/decrypt', { workspace_id: workspace, items: [{ id, ...encrypted }] }, readOnlyToken), jitEnv, async () => true, async () => true, exp * 1000);
+  assert.equal(atExpiry.status, 403);
+  const afterExpiry = await handleRequest(jitReq('/v1/crypto/jit/decrypt', { workspace_id: workspace, items: [{ id, ...encrypted }] }, readOnlyToken), jitEnv, async () => true, async () => true, (exp + 1) * 1000);
+  assert.equal(afterExpiry.status, 403);
+
+  // Scope enforcement: read_only ticket blocked on /v1/crypto/jit/encrypt
+  const readOnlyEncrypt = await handleRequest(jitReq('/v1/crypto/jit/encrypt', { workspace_id: workspace, id, payload: { first_name: 'New' } }, readOnlyToken), jitEnv, async () => true, async () => true, (iat + 10) * 1000);
+  assert.equal(readOnlyEncrypt.status, 403);
+
+  // Revoked ticket (DB coordinator returns false) -> 403
+  const revoked = await handleRequest(jitReq('/v1/crypto/jit/decrypt', { workspace_id: workspace, items: [{ id, ...encrypted }] }, readOnlyToken), jitEnv, async () => true, async () => false, (iat + 10) * 1000);
+  assert.equal(revoked.status, 403);
+
+  // Wrong workspace -> 403
+  const wrongWs = await handleRequest(jitReq('/v1/crypto/jit/decrypt', { workspace_id: crypto.randomUUID(), items: [{ id, ...encrypted }] }, readOnlyToken), jitEnv, async () => true, async () => true, (iat + 10) * 1000);
+  assert.equal(wrongWs.status, 403);
+
+  // Valid break_glass ticket encrypts
+  const bgEncrypt = await handleRequest(jitReq('/v1/crypto/jit/encrypt', { workspace_id: workspace, id, payload: { first_name: 'Emergency', borrower_id: 'BG1' }, index_fields: { borrower_id: 'BG1' } }, breakGlassToken), jitEnv, async () => true, async () => true, (iat + 10) * 1000);
+  assert.equal(bgEncrypt.status, 200);
+});

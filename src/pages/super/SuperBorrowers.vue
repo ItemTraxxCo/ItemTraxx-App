@@ -16,8 +16,16 @@
       </div>
     </div>
 
+    <SuperJitAccessBar
+      :workspaces="workspaces"
+      :default-workspace-id="workspaceFilter"
+      @ticket-granted="handleJitGranted"
+      @ticket-cleared="handleJitCleared"
+    />
+
     <section class="sa-panel">
       <h2>Create Borrower</h2>
+      <p v-if="!hasBreakGlassForForm" class="muted">Break-glass JIT ticket required to create borrowers.</p>
       <form class="form" @submit.prevent="handleCreate">
         <label>Workspace<select v-model="formWorkspaceId"><option value="">Select workspace</option><option v-for="t in workspaces" :key="t.id" :value="t.id">{{ t.name }}</option></select></label>
         <template v-if="encryptedMode === true">
@@ -52,11 +60,25 @@
         <button type="button" class="sa-btn" @click="loadBorrowers">Search</button>
       </div>
       <div class="panel-actions">
-        <button type="button" class="sa-btn" @click="exportCsv">Export CSV</button>
-        <button type="button" class="sa-btn" @click="exportPdf">Export PDF</button>
+        <button type="button" class="sa-btn" :disabled="!hasJitReadForFilter" @click="exportCsv">Export CSV</button>
+        <button type="button" class="sa-btn" :disabled="!hasJitReadForFilter" @click="exportPdf">Export PDF</button>
       </div>
       <SkeletonLoader v-if="isLoading" variant="table" :rows="6" :columns="4" label="Loading all borrowers" />
       <p v-else-if="error" class="sa-error" v-app-toast-error>{{ error }}</p>
+      <div v-else-if="!hasJitReadForFilter" class="sa-table-wrap">
+        <p class="muted">Showing unencrypted metadata only ({{ metadataRows.length }} records). Request a JIT ticket for a single workspace to decrypt borrower payloads.</p>
+        <table class="sa-table">
+          <thead><tr><th>Record ID</th><th>Workspace</th><th>Access Mode</th><th>Created</th></tr></thead>
+          <tbody>
+            <tr v-for="row in metadataRows" :key="row.id">
+              <td><code>{{ row.id }}</code></td>
+              <td>{{ workspaceNameById.get(row.workspace_id) || row.workspace_id }}</td>
+              <td>{{ row.access_mode }}</td>
+              <td>{{ row.created_at }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
       <div v-else class="sa-table-wrap">
         <table class="sa-table">
           <thead><tr><th>Username</th><th>Workspace</th><th>Borrower ID</th><th>Actions</th></tr></thead>
@@ -104,22 +126,34 @@ import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { RouterLink, useRouter } from "vue-router";
 import SkeletonLoader from "../../components/SkeletonLoader.vue";
 import StepUpModal from "../../components/StepUpModal.vue";
+import SuperJitAccessBar from "../../components/SuperJitAccessBar.vue";
 import {
   handleSuperAdminUnauthorized,
   isUnauthorizedError,
 } from "../../services/authErrorHandling";
-import { createSuperBorrower, deleteSuperBorrower, getSuperBorrowerEncryptionMode, listSuperBorrowers, type SuperBorrowerItem } from "../../services/superBorrowerService";
+import {
+  createSuperBorrower,
+  deleteSuperBorrower,
+  getSuperBorrowerEncryptionMode,
+  listSuperBorrowerMetadata,
+  listSuperBorrowers,
+  type SuperBorrowerItem,
+  type SuperBorrowerMetadataItem,
+} from "../../services/superBorrowerService";
 import { listWorkspaces as listWorkspaces, type SuperWorkspace as SuperWorkspace } from "../../services/superWorkspaceService";
 import { exportRowsToCsv, exportRowsToPdf } from "../../services/exportService";
 import { generateBorrowerIdentity } from "../../utils/borrowerIdentity";
 import { toUserFacingErrorMessage } from "../../services/appErrors";
 import { getAuthState } from "../../store/authState";
+import { getActiveJitTokenForWorkspace, useActiveJitSession, type JitTicketScope } from "../../store/jitAccessState";
 
 const router = useRouter();
 const authState = getAuthState();
+const { activeJitSession } = useActiveJitSession();
 let sessionVersion = 0;
 const workspaces = ref<SuperWorkspace[]>([]);
 const borrowers = ref<SuperBorrowerItem[]>([]);
+const metadataRows = ref<SuperBorrowerMetadataItem[]>([]);
 const workspaceFilter = ref("all");
 const search = ref("");
 const isLoading = ref(false);
@@ -146,6 +180,30 @@ const deleteTarget = ref<SuperBorrowerItem | null>(null);
 let toastTimer: number | null = null;
 
 const workspaceNameById = computed(() => new Map(workspaces.value.map((t) => [t.id, t.name])));
+const hasJitReadForFilter = computed(() => {
+  void activeJitSession.value;
+  return workspaceFilter.value !== "all" && Boolean(getActiveJitTokenForWorkspace(workspaceFilter.value, "read_only"));
+});
+const hasBreakGlassForForm = computed(() => {
+  void activeJitSession.value;
+  return Boolean(formWorkspaceId.value && getActiveJitTokenForWorkspace(formWorkspaceId.value, "break_glass"));
+});
+
+const handleJitGranted = async (payload: { workspaceId: string; scope: JitTicketScope }) => {
+  workspaceFilter.value = payload.workspaceId;
+  if (payload.scope === "break_glass" && !formWorkspaceId.value) {
+    formWorkspaceId.value = payload.workspaceId;
+  }
+  await loadBorrowers();
+};
+
+const handleJitCleared = async () => {
+  borrowers.value = [];
+  editItem.value = null;
+  editUsername.value = "";
+  editBorrowerId.value = "";
+  await loadBorrowers();
+};
 
 const regenerateIdentity = () => {
   const identity = generateBorrowerIdentity();
@@ -185,6 +243,13 @@ const loadBorrowers = async () => {
   isLoading.value = true;
   error.value = "";
   try {
+    if (!hasJitReadForFilter.value) {
+      borrowers.value = [];
+      const rows = await listSuperBorrowerMetadata(workspaceFilter.value);
+      if (version !== sessionVersion) return;
+      metadataRows.value = rows;
+      return;
+    }
     const rows = await listSuperBorrowers(workspaceFilter.value, search.value.trim());
     if (version !== sessionVersion) return;
     borrowers.value = [...rows].sort((a, b) => a.username.localeCompare(b.username, undefined, { sensitivity: 'base', numeric: true }));

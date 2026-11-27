@@ -1,12 +1,9 @@
 import type { SuperOpsContext } from "../context.ts";
-import { decryptSuperBorrowers, loadLegacyBorrowerFields } from "../../_shared/superEncryptedBorrowers.ts";
-import { borrowerEncryptionModes } from "../../_shared/borrowerEncryptionMode.ts";
 
 export const INTERNAL_OPS_ACTIONS = ["get_internal_ops_snapshot"] as const;
 
 export const handleInternalOpsAction = async (
   context: SuperOpsContext,
-  decryptBorrowers: typeof decryptSuperBorrowers = decryptSuperBorrowers,
 ): Promise<Response | null> => {
   const { action, adminClient, jsonResponse } = context;
 
@@ -16,7 +13,6 @@ export const handleInternalOpsAction = async (
     const since24hIso = new Date(Date.now() - 24 * 60 * 60 * 1000)
       .toISOString();
 
-    const encryptedMode = Deno.env.get("ITX_ENCRYPTED_BORROWERS_LOCAL") === "true";
     const [
       recentLogsResult,
       queueRowsResult,
@@ -28,7 +24,7 @@ export const handleInternalOpsAction = async (
       adminClient
         .from("item_logs")
         .select(
-          "workspace_id, item_id, checked_out_by, action_type, action_time",
+          "workspace_id, action_type, action_time",
         )
         .in("action_type", ["checkout", "return"])
         .gte("action_time", since24hIso)
@@ -159,41 +155,13 @@ export const handleInternalOpsAction = async (
         ): value is string => !!value),
       ),
     );
-    const itemIds = Array.from(
-      new Set(
-        recentLogs.map((row) => row.item_id).filter((
-          value,
-        ): value is string => !!value),
-      ),
-    );
-    const borrowerIds = Array.from(
-      new Set(
-        recentLogs.map((row) => row.checked_out_by).filter((
-          value,
-        ): value is string => !!value),
-      ),
-    );
 
     const [
       workspaceRowsResult,
-      itemRowsResult,
-      borrowerRowsResult,
       allWorkspacesResult,
     ] = await Promise.all([
       workspaceIds.length
         ? adminClient.from("workspaces").select("id, name").in("id", workspaceIds)
-        : Promise.resolve({ data: [], error: null }),
-      itemIds.length
-        ? adminClient.from("items").select("id, name, barcode").in(
-          "id",
-          itemIds,
-        )
-        : Promise.resolve({ data: [], error: null }),
-      borrowerIds.length
-        ? adminClient.from("borrowers").select("id,workspace_id,encrypted_data,nonce,auth_tag,key_version").in(
-          "id",
-          borrowerIds,
-        )
         : Promise.resolve({ data: [], error: null }),
       adminClient
         .from("workspaces")
@@ -207,68 +175,26 @@ export const handleInternalOpsAction = async (
         tenant,
       ) => [tenant.id as string, tenant.name as string]),
     );
-    const itemMap = new Map(
-      (itemRowsResult.data ?? []).map((item) => [
-        item.id as string,
-        {
-          name: item.name as string | null,
-          barcode: item.barcode as string | null,
-        },
-      ]),
-    );
-    if (borrowerRowsResult.error) return jsonResponse(503, { error: "Borrower data unavailable." });
-    const sourceBorrowers = borrowerRowsResult.data ?? [];
-    const typedBorrowers = sourceBorrowers as unknown as Array<{ id: string; workspace_id: string; username: string | null; borrower_id: string | null }>;
-    const modes = await borrowerEncryptionModes(adminClient, typedBorrowers.map(row => row.workspace_id), encryptedMode);
-    const hydrated = await loadLegacyBorrowerFields(typedBorrowers as unknown as Parameters<typeof loadLegacyBorrowerFields>[0], modes, async ids => {
-      const { data, error } = await adminClient.from("borrowers").select("id,workspace_id,username,borrower_id").in("id", ids);
-      if (error) throw new Error("Borrower data unavailable");
-      return data ?? [];
-    });
-    const encryptedRows = hydrated.filter(row => modes.get(row.workspace_id));
-    const decrypted = await decryptBorrowers(encryptedRows as unknown as Parameters<typeof decryptSuperBorrowers>[0], Deno.env.get("ITX_SGW_INTERNAL_SECRET") ?? "");
-    const decryptedById = new Map(decrypted.map(row => [row.id, row]));
-    const borrowers = hydrated.map(row => {
-      if (!modes.get(row.workspace_id)) return row;
-      const item = decryptedById.get(row.id);
-      if (!item) throw new Error("Borrower data unavailable");
-      return item;
-    });
-    const borrowerMap = new Map(
-      borrowers.map((borrower) => [
-        borrower.id as string,
-        {
-          username: borrower.username as string | null,
-          borrower_id: borrower.borrower_id as string | null,
-          workspace_id: borrower.workspace_id,
-        },
-      ]),
-    );
     const allWorkspaces = (allWorkspacesResult.data ?? []) as Array<{
       id: string;
       name: string;
       status: string | null;
     }>;
 
-    const recentEvents = recentLogs.slice(0, 40).map((row) => {
-      const item = row.item_id ? itemMap.get(row.item_id) : null;
-      const matchedBorrower = row.checked_out_by
-        ? borrowerMap.get(row.checked_out_by)
-        : null;
-      const borrower = matchedBorrower?.workspace_id === row.workspace_id ? matchedBorrower : null;
-      return {
-        workspace_id: row.workspace_id,
-        workspace_name: row.workspace_id
-          ? workspaceMap.get(row.workspace_id) ?? "Unknown workspace"
-          : "Unknown workspace",
-        action_type: row.action_type,
-        action_time: row.action_time,
-        item_name: item?.name ?? null,
-        item_barcode: item?.barcode ?? null,
-        borrower_username: borrower?.username ?? null,
-        borrower_id: borrower?.borrower_id ?? null,
-      };
-    });
+    // Operational metadata only: tenant item labels and borrower payloads
+    // require a workspace-scoped JIT ticket in the dedicated support views.
+    const recentEvents = recentLogs.slice(0, 40).map((row) => ({
+      workspace_id: row.workspace_id,
+      workspace_name: row.workspace_id
+        ? workspaceMap.get(row.workspace_id) ?? "Unknown workspace"
+        : "Unknown workspace",
+      action_type: row.action_type,
+      action_time: row.action_time,
+      item_name: null,
+      item_barcode: null,
+      borrower_username: null,
+      borrower_id: null,
+    }));
 
     const auditRows = (auditRowsResult.data ?? []) as Array<{
       id: string;

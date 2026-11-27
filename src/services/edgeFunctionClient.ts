@@ -2,6 +2,7 @@ type EdgeFunctionOptions<TBody> = {
   method?: "GET" | "POST";
   body?: TBody;
   accessToken?: string;
+  headers?: Record<string, string>;
   preserveErrorData?: boolean;
   /**
    * Use a CORS-simple request for cookie-authenticated endpoints. This avoids
@@ -63,10 +64,15 @@ const requestEdgeFunction = async <TData = unknown, TBody = unknown>(
 
   const method = options.method ?? "POST";
   const accessToken = accessTokenOverride ?? options.accessToken;
+  const extraHeaders = options.headers ?? {};
+  const hasExtraHeaders = Object.keys(extraHeaders).length > 0;
   const useSimpleCorsRequest = Boolean(
-    !accessToken && options.avoidCorsPreflight !== false,
+    !accessToken && !hasExtraHeaders && options.avoidCorsPreflight !== false,
   );
-  const headers = getDefaultHeaders(accessToken);
+  const headers: Record<string, string> = {
+    ...getDefaultHeaders(accessToken),
+    ...extraHeaders,
+  };
   const requestId = createRequestId();
   const startedAt = performance.now();
   if (!useSimpleCorsRequest) headers["x-request-id"] = requestId;

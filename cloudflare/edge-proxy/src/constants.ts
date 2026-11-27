@@ -7,7 +7,7 @@ export const EDGE_PROXY_BODY_HASH_HEADER = "x-itx-edge-proxy-body-sha256";
 
 export const BASE_CORS_HEADERS = {
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-request-id, prefer, x-itx-session-request, x-itx-data-request, x-captcha-response, x-visitor-id",
+    "authorization, x-client-info, apikey, content-type, x-request-id, prefer, x-itx-session-request, x-itx-data-request, x-itx-jit-ticket, x-captcha-response, x-visitor-id",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Access-Control-Allow-Credentials": "true",
   "Access-Control-Expose-Headers":

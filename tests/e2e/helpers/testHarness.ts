@@ -263,6 +263,24 @@ export const mockSuperAdminMutate = async (page: Page) => {
 export const mockSuperItemMutate = async (page: Page) => {
   await page.route(/\/functions(?:\/v1)?\/super-item-mutate(?:\?.*)?$/, async (route) => {
     const body = (route.request().postDataJSON() as { action?: string }) ?? {};
+    if (body.action === "list_metadata") {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          data: [
+            {
+              id: "item-1",
+              workspace_id: "tenant-1",
+              status: "available",
+              created_at: new Date().toISOString(),
+            },
+          ],
+          payload_mode: "metadata",
+        }),
+      });
+      return;
+    }
     if (body.action === "list") {
       await route.fulfill({
         status: 200,
@@ -294,6 +312,26 @@ export const mockSuperItemMutate = async (page: Page) => {
 export const mockSuperBorrowerMutate = async (page: Page) => {
   await page.route(/\/functions(?:\/v1)?\/super-borrower-mutate(?:\?.*)?$/, async (route) => {
     const body = (route.request().postDataJSON() as { action?: string }) ?? {};
+    if (body.action === "list_metadata") {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          data: [
+            {
+              id: "borrower-1",
+              workspace_id: "tenant-1",
+              access_mode: "all",
+              key_version: 1,
+              created_at: new Date().toISOString(),
+              deleted_at: null,
+            },
+          ],
+          payload_mode: "metadata",
+        }),
+      });
+      return;
+    }
     if (body.action === "list") {
       await route.fulfill({
         status: 200,

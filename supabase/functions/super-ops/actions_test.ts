@@ -6,6 +6,7 @@ import { SALES_CUSTOMER_ACTIONS } from "./actions/salesCustomers.ts";
 import { SECURITY_SESSION_ACTIONS } from "./actions/securitySessions.ts";
 import { SUPPORT_ACTIONS } from "./actions/support.ts";
 import { SUBPROCESSOR_ACTIONS } from "./actions/subprocessors.ts";
+import { JIT_ACCESS_ACTIONS } from "./actions/jitAccess.ts";
 import type { SuperOpsContext } from "./context.ts";
 
 const EXPECTED_ACTIONS = [
@@ -39,11 +40,16 @@ const EXPECTED_ACTIONS = [
   "preview_subprocessor_notice",
   "announce_subprocessor_change",
   "list_subprocessor_notices",
+  "request_jit_ticket",
+  "invoke_break_glass",
+  "revoke_jit_ticket",
+  "list_jit_tickets",
+  "list_jit_audit_logs",
 ] as const;
 
-Deno.test("super ops registry contains exactly the 30 live actions", () => {
-  assertEquals(SUPER_OPS_ACTIONS.length, 30);
-  assertEquals(new Set(SUPER_OPS_ACTIONS).size, 30);
+Deno.test("super ops registry contains exactly the 35 live actions", () => {
+  assertEquals(SUPER_OPS_ACTIONS.length, 35);
+  assertEquals(new Set(SUPER_OPS_ACTIONS).size, 35);
   assertEquals([...SUPER_OPS_ACTIONS].sort(), [...EXPECTED_ACTIONS].sort());
 });
 
@@ -55,6 +61,7 @@ Deno.test("super ops family registries partition every live action", () => {
     ...SALES_CUSTOMER_ACTIONS,
     ...INTERNAL_OPS_ACTIONS,
     ...SUBPROCESSOR_ACTIONS,
+    ...JIT_ACCESS_ACTIONS,
   ];
 
   assertEquals(familyActions.length, SUPER_OPS_ACTIONS.length);

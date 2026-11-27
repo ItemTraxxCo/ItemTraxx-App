@@ -212,3 +212,46 @@ Deno.test("Data API request headers preserve only the supported upstream set", (
     "x-request-id": "request-2",
   }, "Data API headers");
 });
+
+Deno.test("JIT support ticket header forwards only to super-* functions and is stripped elsewhere", () => {
+  const req = new Request("https://edge.itemtraxx.com/functions/super-borrower-mutate", {
+    headers: { "x-itx-jit-ticket": "header.payload.signature" },
+  });
+  const superHeaders = sanitizeRequestHeaders(
+    req,
+    "anon",
+    "req-jit-1",
+    "super-borrower-mutate",
+    "session-token",
+  );
+  assertEquals(
+    superHeaders.get("x-itx-jit-ticket"),
+    "header.payload.signature",
+    "super function receives JIT ticket header",
+  );
+
+  const tenantHeaders = sanitizeRequestHeaders(
+    req,
+    "anon",
+    "req-jit-2",
+    "crypto-broker",
+    "session-token",
+  );
+  assertEquals(
+    tenantHeaders.get("x-itx-jit-ticket"),
+    null,
+    "non-super function must not receive JIT ticket header",
+  );
+
+  const dataHeaders = sanitizeUpstreamHeaders(
+    req,
+    "anon",
+    "req-jit-3",
+    "session-token",
+  );
+  assertEquals(
+    dataHeaders.get("x-itx-jit-ticket"),
+    null,
+    "PostgREST upstream must not receive JIT ticket header",
+  );
+});

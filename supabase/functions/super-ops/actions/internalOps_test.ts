@@ -278,38 +278,48 @@ Deno.test("get_internal_ops_snapshot returns a full snapshot with traffic, queue
     "search index tenant",
   );
   assert(data.recent_events.length === 3, "recent events length");
-  assert(data.recent_events[0].item_name === "Chromebook 12", "item name resolved");
-  assert(data.recent_events[0].borrower_username === "jdoe", "borrower resolved");
+  assert(data.recent_events[0].item_name === null, "item name redacted in metadata snapshot");
+  assert(data.recent_events[0].item_barcode === null, "item barcode redacted in metadata snapshot");
+  assert(data.recent_events[0].borrower_username === null, "borrower username redacted in metadata snapshot");
+  assert(data.recent_events[0].borrower_id === null, "borrower id redacted in metadata snapshot");
   assert(
     data.recent_events[0].workspace_name === "Lincoln Elementary",
     "workspace resolved",
   );
 });
 
-Deno.test('internal traffic never attaches a borrower from a different workspace', async () => {
-  const adminClient = buildAdminClient({
-    item_logs: { data: [{ workspace_id: 'workspace-a', item_id: 'item-a', checked_out_by: 'borrower-b', action_type: 'checkout', action_time: new Date().toISOString() }], error: null },
-    borrowers: { data: [{ id: 'borrower-b', workspace_id: 'workspace-b', username: 'Private', borrower_id: 'ID' }], error: null },
+Deno.test("internal ops snapshot never queries borrowers or items tables", async () => {
+  const touchedTables: string[] = [];
+  const baseClient = buildAdminClient({
+    item_logs: {
+      data: [{
+        workspace_id: "10000000-0000-4000-8000-000000000001",
+        action_type: "checkout",
+        action_time: new Date().toISOString(),
+      }],
+      error: null,
+    },
+    workspaces: {
+      data: [{ id: "10000000-0000-4000-8000-000000000001", name: "Oak High", status: "active" }],
+      error: null,
+    },
   });
-  const response = await handleInternalOpsAction(contextFor('get_internal_ops_snapshot', {}, adminClient));
-  const body = await response!.json();
-  assert(body.data.recent_events[0].borrower_username === null, 'cross-workspace borrower was attached');
-});
-Deno.test('encrypted internal traffic decrypts ciphertext without plaintext fallback', async () => {
-  Deno.env.set('ITX_ENCRYPTED_BORROWERS_LOCAL', 'true');
-  try {
-    const adminClient = buildAdminClient({
-      item_logs: { data: [{ workspace_id: 'workspace-a', item_id: 'item-a', checked_out_by: 'borrower-a', action_type: 'checkout', action_time: new Date().toISOString() }], error: null },
-      borrowers: { data: [{ id: 'borrower-a', workspace_id: 'workspace-a', encrypted_data: 'cipher', nonce: 'nonce', auth_tag: 'tag', key_version: 1 }], error: null },
-    });
-    const decrypt = async (rows: Array<{ id: string; workspace_id: string }>) => rows.map(row => ({ ...row, username: 'Decoded', borrower_id: 'ID' }));
-    const response = await handleInternalOpsAction(contextFor('get_internal_ops_snapshot', {}, adminClient), decrypt as never);
-    const body = await response!.json();
-    assert(body.data.recent_events[0].borrower_username === 'Decoded', 'decrypted borrower missing');
-    let rejected = false;
-    try { await handleInternalOpsAction(contextFor('get_internal_ops_snapshot', {}, adminClient), (async () => { throw new Error('unavailable'); }) as never); } catch { rejected = true; }
-    assert(rejected, 'gateway failure must not fall back to plaintext');
-  } finally { Deno.env.delete('ITX_ENCRYPTED_BORROWERS_LOCAL'); }
+  const trackedClient = {
+    ...baseClient,
+    from: (table: string) => {
+      touchedTables.push(table);
+      return baseClient.from(table);
+    },
+  };
+  const response = await handleInternalOpsAction(
+    contextFor("get_internal_ops_snapshot", {}, trackedClient),
+  );
+  assert(response!.status === 200, "expected 200");
+  assert(!touchedTables.includes("borrowers"), "snapshot must not touch borrowers table");
+  assert(!touchedTables.includes("items"), "snapshot must not touch items table");
+  const body = await response!.json() as { data: { recent_events: Array<Record<string, unknown>> } };
+  assert(body.data.recent_events[0].borrower_username === null, "borrower username must stay null");
+  assert(body.data.recent_events[0].item_name === null, "item name must stay null");
 });
 
 Deno.test("get_internal_ops_snapshot falls back to Unknown workspace and nulls for unmapped events", async () => {

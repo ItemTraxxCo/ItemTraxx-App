@@ -10,8 +10,8 @@ export type TenantFeatureFlags = {
   enable_barcode_generator: boolean;
 };
 
-export type SuperItemAction = "list" | "create" | "update" | "delete";
-export type SuperBorrowerAction = "list" | "create" | "update" | "delete" | "workspace_mode";
+export type SuperItemAction = "list" | "list_metadata" | "create" | "update" | "delete";
+export type SuperBorrowerAction = "list" | "list_metadata" | "create" | "update" | "delete" | "workspace_mode";
 
 export type AdminOpsAction =
   | "get_notifications"

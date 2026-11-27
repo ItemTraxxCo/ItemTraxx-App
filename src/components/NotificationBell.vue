@@ -1,10 +1,11 @@
 <template>
-  <div class="notif-wrap">
+  <div v-if="notificationsEnabled" ref="wrapRef" class="notif-wrap">
     <button
+      ref="buttonRef"
       type="button"
       class="notif-button"
       @click="toggleOpen"
-      aria-label="Notifications"
+      :aria-label="badgeCount > 0 ? `Notifications, ${badgeCount} new` : 'Notifications'"
       aria-haspopup="dialog"
       :aria-expanded="isOpen"
       aria-controls="workspace-notifications-panel"
@@ -26,20 +27,53 @@
           stroke-width="1.8"
         />
       </svg>
-      <span v-if="badgeCount > 0" class="notif-badge">{{ badgeCount > 9 ? "9+" : badgeCount }}</span>
+      <span v-if="badgeCount > 0" class="notif-badge" aria-hidden="true">{{ badgeCount > 9 ? "9+" : badgeCount }}</span>
     </button>
 
     <div
       v-if="isOpen"
       id="workspace-notifications-panel"
+      ref="panelRef"
       class="notif-dropdown"
       role="dialog"
       aria-label="Workspace notifications"
+      tabindex="-1"
     >
       <div class="notif-header">Notifications</div>
-      <p v-if="isLoading" class="muted">Loading notifications...</p>
-      <p v-else-if="error" class="error" v-app-toast-error>{{ error }}</p>
+      <p v-if="isLoading && !hasLoaded && !error" class="muted">Loading notifications...</p>
+      <div v-else-if="error && !hasLoaded" class="notif-error" role="alert">
+        <p class="error">{{ error }}</p>
+        <button type="button" class="notif-retry" :disabled="isLoading" @click="retry">
+          <svg class="notif-retry-icon" :class="{ spinning: isLoading }" viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              d="M20 12a8 8 0 1 1-2.34-5.66M20 4v4.5h-4.5"
+              fill="none"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+            />
+          </svg>
+          {{ isLoading ? "Retrying" : "Retry" }}
+        </button>
+      </div>
       <template v-else>
+        <div v-if="error" class="notif-stale" role="status">
+          <span class="muted">Couldn't refresh. Showing last known notifications.</span>
+          <button type="button" class="notif-retry" :disabled="isLoading" @click="retry">
+            <svg class="notif-retry-icon" :class="{ spinning: isLoading }" viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M20 12a8 8 0 1 1-2.34-5.66M20 4v4.5h-4.5"
+                fill="none"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+              />
+            </svg>
+            {{ isLoading ? "Retrying" : "Retry" }}
+          </button>
+        </div>
         <ul class="notif-list">
           <li v-if="overdueCount > 0" class="notif-item notif-warn">
             {{ overdueCount }} overdue checkout{{ overdueCount === 1 ? "" : "s" }} (limit:
@@ -52,18 +86,40 @@
             :class="update.level === 'critical' ? 'notif-critical' : update.level === 'warning' ? 'notif-warn' : ''"
           >
             <strong>{{ update.title }}:</strong> {{ update.message }}
+            <a
+              v-if="isSafeExternalLink(update.link_url)"
+              class="notif-link"
+              :href="update.link_url"
+              target="_blank"
+              rel="noopener noreferrer"
+            >Learn more</a>
           </li>
-          <li v-if="flaggedCount > 0" class="notif-item notif-warn">
-            {{ flaggedCount }} item{{ flaggedCount === 1 ? "" : "s" }} need status follow-up.
+          <li v-if="flaggedCount > 0" class="notif-item notif-warn" :class="{ 'notif-clickable': statusTrackingEnabled }">
+            <RouterLink v-if="statusTrackingEnabled" class="notif-row-link" :to="{ path: STATUS_TRACKING_PATH }">
+              {{ flaggedCount }} item{{ flaggedCount === 1 ? "" : "s" }} need status follow-up.
+            </RouterLink>
+            <template v-else>
+              {{ flaggedCount }} item{{ flaggedCount === 1 ? "" : "s" }} need status follow-up.
+            </template>
           </li>
           <li
             v-for="event in recentEvents"
             :key="event.id"
             class="notif-item"
+            :class="{ 'notif-clickable': statusTrackingEnabled && !!event.item_id }"
           >
-            {{ event.item?.name || "Item" }} marked {{ event.status }}.
+            <RouterLink
+              v-if="statusTrackingEnabled && event.item_id"
+              class="notif-row-link"
+              :to="{ path: STATUS_TRACKING_PATH, query: { item: event.item_id } }"
+            >
+              {{ event.item?.name || "Item" }} marked {{ formatItemStatus(event.status).toLowerCase() }}.
+            </RouterLink>
+            <template v-else>
+              {{ event.item?.name || "Item" }} marked {{ formatItemStatus(event.status).toLowerCase() }}.
+            </template>
           </li>
-          <li v-if="unreadCount === 0" class="notif-item muted">No new notifications.</li>
+          <li v-if="!hasAnyRows" class="notif-item muted">No new notifications.</li>
         </ul>
       </template>
     </div>
@@ -71,11 +127,39 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from "vue";
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
+import { RouterLink, useRoute } from "vue-router";
 import { fetchWorkspaceNotifications, type StatusHistoryItem } from "../services/adminOpsService";
+import { getAuthState } from "../store/authState";
+import { formatItemStatus } from "../utils/itemStatus";
+import {
+  EMPTY_SEEN_STATE,
+  LEGACY_DISMISSED_KEY,
+  countUnseen,
+  isSafeExternalLink,
+  markAllSeen,
+  parseSeenState,
+  reconcileSeenState,
+  seenStateStorageKey,
+  seenStatesEqual,
+  type NotificationSeenState,
+  type NotificationSnapshot,
+} from "../utils/notificationSeenState";
+
+const emit = defineEmits<{ opened: [] }>();
+
+const STATUS_TRACKING_PATH = "/admin/item-status";
+
+const route = useRoute();
+const wrapRef = ref<HTMLElement | null>(null);
+const buttonRef = ref<HTMLButtonElement | null>(null);
+const panelRef = ref<HTMLElement | null>(null);
 
 const isOpen = ref(false);
 const isLoading = ref(false);
+const hasLoaded = ref(false);
+const notificationsEnabled = ref(true);
+const statusTrackingEnabled = ref(true);
 const error = ref("");
 const flaggedCount = ref(0);
 const overdueCount = ref(0);
@@ -86,77 +170,97 @@ const updates = ref<
     title: string;
     message: string;
     level: "info" | "warning" | "critical";
+    link_url: string | null;
   }>
 >([]);
 const recentEvents = ref<StatusHistoryItem[]>([]);
+const seenState = ref<NotificationSeenState>({ ...EMPTY_SEEN_STATE });
 let pollTimer: number | null = null;
-const NOTIFICATION_DISMISSED_KEY = "itemtraxx:tenant-notifications:dismissed-signature:v1";
-const dismissedSignature = ref("");
+let loadSequence = 0;
 
-const unreadCount = computed(
+// Read state is scoped per user and workspace so a shared device or a second
+// workspace never inherits another account's dismissals.
+const storageKey = () => {
+  const auth = getAuthState();
+  return seenStateStorageKey(auth.userId, auth.workspaceContextId ?? auth.sessionWorkspaceId);
+};
+
+const snapshot = computed<NotificationSnapshot>(() => ({
+  overdueCount: overdueCount.value,
+  flaggedCount: flaggedCount.value,
+  updateIds: updates.value.map((item) => item.id),
+  eventIds: recentEvents.value.map((item) => item.id),
+}));
+
+const hasAnyRows = computed(
   () =>
-    flaggedCount.value +
-    overdueCount.value +
-    updates.value.length
+    overdueCount.value > 0 ||
+    flaggedCount.value > 0 ||
+    updates.value.length > 0 ||
+    recentEvents.value.length > 0
 );
-
-const notificationSignature = computed(() => {
-  const updateIds = updates.value.map((item) => item.id).join(",");
-  const eventIds = recentEvents.value.map((item) => item.id).join(",");
-  return [
-    `flagged:${flaggedCount.value}`,
-    `overdue:${overdueCount.value}`,
-    `updates:${updateIds}`,
-    `events:${eventIds}`,
-  ].join("|");
-});
 
 const badgeCount = computed(() =>
-  dismissedSignature.value === notificationSignature.value ? 0 : unreadCount.value
+  hasLoaded.value ? countUnseen(snapshot.value, seenState.value) : 0
 );
 
-const loadDismissedSignature = () => {
+const loadSeenState = () => {
   try {
-    dismissedSignature.value = window.localStorage.getItem(NOTIFICATION_DISMISSED_KEY) ?? "";
+    window.localStorage.removeItem(LEGACY_DISMISSED_KEY);
+    seenState.value = parseSeenState(window.localStorage.getItem(storageKey()));
   } catch {
-    dismissedSignature.value = "";
+    seenState.value = { ...EMPTY_SEEN_STATE };
   }
 };
 
-const persistDismissedSignature = (signature: string) => {
-  dismissedSignature.value = signature;
+const persistSeenState = (next: NotificationSeenState) => {
+  if (seenStatesEqual(next, seenState.value)) return;
+  seenState.value = next;
   try {
-    window.localStorage.setItem(NOTIFICATION_DISMISSED_KEY, signature);
+    window.localStorage.setItem(storageKey(), JSON.stringify(next));
   } catch {
-    // Ignore storage failures.
+    // Ignore storage failures; read state still applies for this page view.
   }
 };
 
-const loadNotifications = async (showLoading = true) => {
+const markCurrentSeen = () => {
+  if (!hasLoaded.value) return;
+  persistSeenState(markAllSeen(snapshot.value));
+};
+
+const loadNotifications = async () => {
   if (document.visibilityState === "hidden") return;
-  if (showLoading) {
-    isLoading.value = true;
-  }
-  error.value = "";
+  const sequence = ++loadSequence;
+  isLoading.value = true;
   try {
     const payload = await fetchWorkspaceNotifications();
+    if (sequence !== loadSequence) return;
+    error.value = "";
     if (payload.feature_flags?.enable_notifications === false) {
+      notificationsEnabled.value = false;
+      isOpen.value = false;
       flaggedCount.value = 0;
       overdueCount.value = 0;
-      checkoutDueHours.value = 72;
       updates.value = [];
       recentEvents.value = [];
-      return;
+    } else {
+      notificationsEnabled.value = true;
+      statusTrackingEnabled.value = payload.feature_flags?.enable_status_tracking !== false;
+      flaggedCount.value = payload.flagged_count;
+      overdueCount.value = payload.overdue_count;
+      checkoutDueHours.value = payload.checkout_due_hours;
+      updates.value = payload.updates.slice(0, 3);
+      recentEvents.value = payload.recent_status_events.slice(0, 4);
     }
-    flaggedCount.value = payload.flagged_count;
-    overdueCount.value = payload.overdue_count;
-    checkoutDueHours.value = payload.checkout_due_hours;
-    updates.value = payload.updates.slice(0, 3);
-    recentEvents.value = payload.recent_status_events.slice(0, 4);
+    hasLoaded.value = true;
+    persistSeenState(reconcileSeenState(snapshot.value, seenState.value));
+    // Anything that arrives while the panel is open is being looked at.
+    if (isOpen.value) markCurrentSeen();
   } catch (err) {
+    if (sequence !== loadSequence) return;
     error.value = err instanceof Error ? err.message : "Unable to load notifications.";
   } finally {
-    if (showLoading) {
+    if (sequence === loadSequence) {
       isLoading.value = false;
     }
   }
@@ -165,7 +269,7 @@ const loadNotifications = async (showLoading = true) => {
 const startPolling = () => {
   if (pollTimer) return;
   pollTimer = window.setInterval(() => {
-    void loadNotifications(false);
+    void loadNotifications();
   }, 90_000);
 };
 
@@ -180,28 +284,63 @@ const handleVisibilityChange = () => {
     stopPolling();
     return;
   }
-  void loadNotifications(false);
+  void loadNotifications();
   startPolling();
+};
+
+const retry = () => {
+  if (isLoading.value) return;
+  void loadNotifications();
+};
+
+const close = (restoreFocus = false) => {
+  if (!isOpen.value) return;
+  isOpen.value = false;
+  if (restoreFocus) buttonRef.value?.focus();
 };
 
 const toggleOpen = () => {
-  isOpen.value = !isOpen.value;
   if (isOpen.value) {
-    persistDismissedSignature(notificationSignature.value);
-    void loadNotifications();
+    close();
+    return;
   }
+  isOpen.value = true;
+  emit("opened");
+  markCurrentSeen();
+  void loadNotifications();
+  void nextTick(() => panelRef.value?.focus());
 };
 
+const handleDocumentPointerDown = (event: PointerEvent) => {
+  if (!isOpen.value) return;
+  const target = event.target as Node | null;
+  if (target && wrapRef.value?.contains(target)) return;
+  close();
+};
+
+const handleDocumentKeydown = (event: KeyboardEvent) => {
+  if (event.key === "Escape" && isOpen.value) close(true);
+};
+
+watch(
+  () => route.fullPath,
+  () => close()
+);
+
 onMounted(() => {
-  loadDismissedSignature();
+  loadSeenState();
   void loadNotifications();
   startPolling();
   document.addEventListener("visibilitychange", handleVisibilityChange);
+  document.addEventListener("pointerdown", handleDocumentPointerDown);
+  document.addEventListener("keydown", handleDocumentKeydown);
 });
 
 onUnmounted(() => {
   stopPolling();
   document.removeEventListener("visibilitychange", handleVisibilityChange);
+  document.removeEventListener("pointerdown", handleDocumentPointerDown);
+  document.removeEventListener("keydown", handleDocumentKeydown);
 });
 </script>
 
@@ -255,9 +394,90 @@ onUnmounted(() => {
   z-index: 30;
 }
 
+.notif-dropdown:focus {
+  outline: none;
+}
+
 .notif-header {
   font-weight: 700;
   margin-bottom: 0.5rem;
+}
+
+.notif-stale {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  margin: 0 0 0.5rem;
+}
+
+.notif-error {
+  display: grid;
+  justify-items: start;
+  gap: 0.5rem;
+}
+
+.notif-error .error {
+  margin: 0;
+}
+
+.notif-retry {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-shrink: 0;
+  padding: 0.3rem 0.6rem;
+  font-size: 0.8rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.notif-retry:disabled {
+  cursor: progress;
+  opacity: 0.75;
+}
+
+.notif-retry-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.notif-retry-icon.spinning {
+  animation: notif-spin 0.8s linear infinite;
+}
+
+@keyframes notif-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .notif-retry-icon.spinning {
+    animation: none;
+  }
+}
+
+.notif-clickable {
+  padding: 0;
+}
+
+.notif-row-link {
+  display: block;
+  padding: 0.4rem 0.45rem;
+  border-radius: 8px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.notif-row-link:hover,
+.notif-row-link:focus-visible {
+  background: var(--surface);
+  text-decoration: underline;
 }
 
 .notif-list {
@@ -273,6 +493,11 @@ onUnmounted(() => {
   padding: 0.4rem 0.45rem;
   border-radius: 8px;
   background: var(--surface-2);
+}
+
+.notif-link {
+  margin-left: 0.25rem;
+  white-space: nowrap;
 }
 
 .notif-warn {

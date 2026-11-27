@@ -124,7 +124,7 @@ Deno.test("get_notifications reports flagged/overdue counts and echoes context c
     if (call.table === "items" && call.operations.some((op) => op.method === "lte")) {
       return { data: null, error: null, count: 5 };
     }
-    if (call.table === "items" && call.operations.some((op) => op.method === "not")) {
+    if (call.table === "items" && call.operations.some((op) => op.method === "in")) {
       return { data: null, error: null, count: 3 };
     }
     if (call.table === "item_status_history") {
@@ -166,7 +166,7 @@ Deno.test("get_notifications reports flagged/overdue counts and echoes context c
   );
 });
 
-Deno.test("get_notifications treats query errors as zero counts and empty history", async () => {
+Deno.test("get_notifications surfaces query errors instead of an all-clear payload", async () => {
   const { client } = makeClient((call) => {
     if (call.table === "items") {
       return { data: null, error: { code: "500", message: "boom" }, count: null };
@@ -176,18 +176,108 @@ Deno.test("get_notifications treats query errors as zero counts and empty histor
     }
     return { data: null, error: null };
   });
-  const response = await handleNotificationAction(baseContext(client));
-  const body = await bodyOf(response);
-  const data = body.data as Record<string, unknown>;
+  const originalConsoleError = console.error;
+  console.error = () => {};
+  try {
+    const response = await handleNotificationAction(baseContext(client));
+    const body = await bodyOf(response);
 
-  assert(response.status === 200, "errors should still produce a 200 with safe defaults");
-  assert(data.overdue_count === 0, "expected overdue_count to fall back to 0");
-  assert(data.flagged_count === 0, "expected flagged_count to fall back to 0");
-  assert(
-    Array.isArray(data.recent_status_events) &&
-      (data.recent_status_events as unknown[]).length === 0,
-    "expected recent_status_events to fall back to []",
+    assert(response.status === 500, `expected 500, got ${response.status}`);
+    assert(body.error === "Unable to load notifications.", "expected a generic error message");
+    assert(!("data" in body), "expected no zeroed data payload on failure");
+  } finally {
+    console.error = originalConsoleError;
+  }
+});
+
+Deno.test("get_notifications fails when only the history query errors", async () => {
+  const { client } = makeClient((call) => {
+    if (call.table === "item_status_history") {
+      return { data: null, error: { code: "PGRST", message: "boom" } };
+    }
+    return { data: null, error: null, count: 2 };
+  });
+  const originalConsoleError = console.error;
+  console.error = () => {};
+  try {
+    const response = await handleNotificationAction(baseContext(client));
+    assert(response.status === 500, `expected 500, got ${response.status}`);
+  } finally {
+    console.error = originalConsoleError;
+  }
+});
+
+Deno.test("get_notifications counts only follow-up statuses as flagged", async () => {
+  const { client, calls } = makeClient(() => ({ data: [], error: null, count: 0 }));
+  await handleNotificationAction(baseContext(client));
+  const flaggedCall = calls.find((call) =>
+    call.table === "items" && call.operations.some((op) => op.method === "in")
   );
+  assert(flaggedCall, "expected a flagged-count query using an explicit status list");
+  const inOp = flaggedCall!.operations.find((op) => op.method === "in");
+  const statuses = inOp?.args[1] as string[];
+  assert(inOp?.args[0] === "status", "expected the in() filter to target status");
+  assert(
+    JSON.stringify([...statuses].sort()) === JSON.stringify(["damaged", "in_repair", "lost"]),
+    `unexpected follow-up statuses: ${JSON.stringify(statuses)}`,
+  );
+  assert(!statuses.includes("retired"), "retired items must not count as needing follow-up");
+  assert(!statuses.includes("in_studio_only"), "in_studio_only items must not count as needing follow-up");
+});
+
+Deno.test("get_notifications requires checked_out status for overdue items", async () => {
+  const { client, calls } = makeClient(() => ({ data: [], error: null, count: 0 }));
+  await handleNotificationAction(baseContext(client));
+  const overdueCall = calls.find((call) =>
+    call.table === "items" && call.operations.some((op) => op.method === "lte")
+  );
+  assert(overdueCall, "expected the overdue query to run");
+  assert(
+    overdueCall!.operations.some((op) =>
+      op.method === "eq" && op.args[0] === "status" && op.args[1] === "checked_out"
+    ),
+    "expected overdue query to require status = checked_out",
+  );
+});
+
+Deno.test("get_notifications excludes deleted items from recent events and returns full rows", async () => {
+  const { client, calls } = makeClient((call) => {
+    if (call.table === "item_status_history") {
+      return {
+        data: [{
+          id: "h1",
+          item_id: "i1",
+          status: "lost",
+          note: null,
+          changed_at: "2026-01-01T00:00:00.000Z",
+          changed_by: null,
+          item: { name: "Camera", barcode: "C-1", deleted_at: null },
+        }],
+        error: null,
+      };
+    }
+    return { data: null, error: null, count: 0 };
+  });
+  const response = await handleNotificationAction(baseContext(client));
+  const data = (await bodyOf(response)).data as Record<string, unknown>;
+  const historyCall = calls.find((call) => call.table === "item_status_history");
+  const selectArg = String(historyCall?.operations.find((op) => op.method === "select")?.args[0]);
+  assert(selectArg.includes("!inner"), "expected an inner join on the item");
+  assert(
+    ["item_id", "note", "changed_by"].every((column) => selectArg.includes(column)),
+    "expected the select to include every StatusHistoryItem column",
+  );
+  assert(
+    historyCall!.operations.some((op) =>
+      op.method === "is" && op.args[0] === "item.deleted_at" && op.args[1] === null
+    ),
+    "expected events for soft-deleted items to be filtered out",
+  );
+  const events = data.recent_status_events as Array<Record<string, unknown>>;
+  assert(events[0].item_id === "i1", "expected item_id in the event payload");
+  const item = events[0].item as Record<string, unknown>;
+  assert(item.name === "Camera" && item.barcode === "C-1", "expected item name and barcode");
+  assert(!("deleted_at" in item), "expected deleted_at to be stripped from the payload");
 });
 
 Deno.test("get_notifications derives the overdue cutoff from checkoutDueHours", async () => {
@@ -253,8 +343,32 @@ Deno.test("normalizeWorkspaceUpdates applies defaults for title, level, created_
   assert(item.title === "Product update", "expected default title");
   assert(item.level === "info", "expected default level");
   assert(typeof item.created_at === "string" && item.created_at.length > 0, "expected created_at to be set");
-  assert(item.id === `${item.created_at}-0`, "expected id to derive from created_at and index");
+  assert(item.id.startsWith("update-"), "expected a derived fallback id");
   assert(item.link_url === null, "expected link_url to default to null");
+});
+
+Deno.test("normalizeWorkspaceUpdates fallback ids and dates are stable across calls", () => {
+  const input = { enabled: true, items: [{ message: "Same message", title: "Same" }] };
+  const first = normalizeWorkspaceUpdates(input);
+  const second = normalizeWorkspaceUpdates(input);
+  assert(first[0].id === second[0].id, "expected the fallback id to be deterministic");
+  assert(first[0].created_at === second[0].created_at, "expected the fallback created_at to be deterministic");
+  const other = normalizeWorkspaceUpdates({ enabled: true, items: [{ message: "Different" }] });
+  assert(other[0].id !== first[0].id, "expected different content to get a different id");
+});
+
+Deno.test("normalizeWorkspaceUpdates drops non-https links", () => {
+  const result = normalizeWorkspaceUpdates({
+    enabled: true,
+    items: [
+      { message: "a", link_url: "javascript:alert(1)" },
+      { message: "b", link_url: "http://example.com" },
+      { message: "c", link_url: "https://example.com/path" },
+    ],
+  });
+  assert(result[0].link_url === null, "javascript: links must be dropped");
+  assert(result[1].link_url === null, "plain http links must be dropped");
+  assert(result[2].link_url === "https://example.com/path", "https links must be kept");
 });
 
 Deno.test("normalizeWorkspaceUpdates preserves explicit level, id, link_url, and trims blanks", () => {

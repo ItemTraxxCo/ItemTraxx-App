@@ -1,6 +1,7 @@
 import { invokeEdgeFunction } from "./edgeFunctionClient";
 import type { EdgeEnvelope } from "../types/edgeContracts";
 import { edgeFunctionError } from "./appErrors";
+import { getActiveJitTokenForWorkspace } from "../store/jitAccessState";
 
 export type SuperLogEntry = {
   id: string;
@@ -13,25 +14,39 @@ export type SuperLogEntry = {
   item: { id: string; name: string; barcode: string } | null;
   borrower: { id: string; username: string; borrower_id: string } | null;
   workspace: { id: string; name: string } | null;
+  pii_redacted?: boolean;
 };
 
-export const listSuperLogs = async (payload: {
-  workspace_id?: string;
-  action_type?: string;
-  search?: string;
-  start_at?: string;
-  end_at?: string;
-  page?: number;
-  page_size?: number;
-}) => {
+export const listSuperLogs = async (
+  payload: {
+    workspace_id?: string;
+    action_type?: string;
+    search?: string;
+    start_at?: string;
+    end_at?: string;
+    page?: number;
+    page_size?: number;
+    include_payload?: boolean;
+  },
+  jitToken?: string | null,
+) => {
+  const resolvedToken = payload.include_payload
+    ? (jitToken ??
+      (payload.workspace_id && payload.workspace_id !== "all"
+        ? getActiveJitTokenForWorkspace(payload.workspace_id, "read_only")
+        : null))
+    : null;
   const result = await invokeEdgeFunction<EdgeEnvelope<SuperLogEntry[]> & {
     data?: SuperLogEntry[];
     page?: number;
     page_size?: number;
     count?: number;
+    payload_mode?: "metadata" | "decrypted";
+    pii_redacted?: boolean;
   }>("super-logs-query", {
     method: "POST",
     body: { payload },
+    ...(resolvedToken ? { headers: { "x-itx-jit-ticket": resolvedToken } } : {}),
   });
 
   if (!result.ok) {
@@ -43,5 +58,7 @@ export const listSuperLogs = async (payload: {
     page: result.data?.page ?? 1,
     pageSize: result.data?.page_size ?? payload.page_size ?? 50,
     count: result.data?.count ?? 0,
+    payloadMode: result.data?.payload_mode ?? "metadata",
+    piiRedacted: result.data?.pii_redacted ?? true,
   };
 };

@@ -11,6 +11,13 @@ import { readJsonBody } from "../_shared/requestBody.ts";
 import { rpcErrorToError, throwOnRpcError } from "./reportingRefresh.ts";
 import { callBetterAuthAdmin } from "../_shared/betterAuthAdmin.ts";
 import { ensureWorkspaceKeyRevoked, revokeWorkspaceKey } from "../_shared/sgwLifecycle.ts";
+import {
+  computeExponentialBackoffMs,
+  deliverSingleWebhookTarget,
+  dispatchJitSecurityEvent,
+  type JitAlertChannelKind,
+  type JitWebhookPayload,
+} from "../_shared/jitWebhooks.ts";
 import { purgeExpiredWorkspaces, type WorkspacePurgeDeps } from "./workspacePurge.ts";
 import {
   asRecord,
@@ -1093,6 +1100,27 @@ serve((req) => withRequestSpan(req, "POST /functions/job-worker", async (span, r
             "refresh_super_reporting_views",
           );
           throwOnRpcError("refresh_super_reporting_views", refreshError);
+        } else if (job.job_type === "jit_audit_webhook") {
+          const webhookJob = asRecord(job.payload) as {
+            kind?: JitAlertChannelKind;
+            url?: string;
+            payload?: JitWebhookPayload;
+            event_signature?: string;
+          };
+          if (!webhookJob.kind || !webhookJob.payload) {
+            throw new Error("Invalid JIT webhook job payload");
+          }
+          const delivery = await deliverSingleWebhookTarget({
+            kind: webhookJob.kind,
+            url: webhookJob.url,
+            payload: webhookJob.payload,
+            rawBody: JSON.stringify(webhookJob.payload),
+            eventSignature: webhookJob.event_signature ?? "",
+            adminClient,
+          });
+          if (!delivery.ok) {
+            throw new Error(delivery.error ?? "JIT audit webhook delivery failed");
+          }
         }
 
         const { error: completeError } = await adminClient
@@ -1110,13 +1138,16 @@ serve((req) => withRequestSpan(req, "POST /functions/job-worker", async (span, r
         completed += 1;
       } catch (error) {
         const hitMaxAttempts = job.attempts >= job.max_attempts;
+        const retryDelayMs = job.job_type === "jit_audit_webhook"
+          ? computeExponentialBackoffMs(job.attempts)
+          : Math.min(5 * 60_000, job.attempts * 30_000);
         const { error: failError } = await adminClient
           .from("async_jobs")
           .update({
             status: hitMaxAttempts ? "failed" : "queued",
             run_after: hitMaxAttempts
               ? new Date().toISOString()
-              : new Date(Date.now() + Math.min(5 * 60_000, job.attempts * 30_000)).toISOString(),
+              : new Date(Date.now() + retryDelayMs).toISOString(),
             completed_at: hitMaxAttempts ? new Date().toISOString() : null,
             last_error: error instanceof Error ? error.message.slice(0, 1000) : "Unknown error",
           })
@@ -1226,12 +1257,63 @@ serve((req) => withRequestSpan(req, "POST /functions/job-worker", async (span, r
       }
     }
 
+    let jitTicketsExpired = 0;
+    if (body.run_jit_expiry_sweep !== false) {
+      const { data: expiredTickets, error: expireError } = await adminClient.rpc(
+        "expire_stale_jit_tickets",
+        { p_limit: 100 },
+      );
+      if (expireError) {
+        logError("job-worker jit expiry sweep failed", requestId, expireError);
+      } else if (Array.isArray(expiredTickets) && expiredTickets.length > 0) {
+        jitTicketsExpired = expiredTickets.length;
+        for (
+          const ticket of expiredTickets as Array<{
+            id: string;
+            admin_user_id: string;
+            workspace_id: string;
+            scope: "read_only" | "break_glass";
+            reason: string;
+            external_ticket_id: string | null;
+            expires_at: string;
+            client_ip_hash: string | null;
+            user_agent: string | null;
+          }>
+        ) {
+          await dispatchJitSecurityEvent({
+            payload: {
+              event_id: crypto.randomUUID(),
+              event_type: "jit.ticket.expired",
+              timestamp_utc: ticket.expires_at ?? new Date().toISOString(),
+              actor: { id: ticket.admin_user_id, email: null },
+              target_workspace_id: ticket.workspace_id,
+              ticket_id: ticket.id,
+              scope: ticket.scope,
+              action: "expire_jit_ticket",
+              reason: ticket.reason,
+              client: {
+                ip_hash: ticket.client_ip_hash,
+                user_agent: ticket.user_agent,
+                request_id: requestId,
+              },
+              metadata: {
+                external_ticket_id: ticket.external_ticket_id,
+              },
+            },
+            adminClient,
+            isBreakGlass: false,
+          });
+        }
+      }
+    }
+
     logInfo("job-worker completed", requestId, {
       claimed: jobs.length,
       completed,
       failed,
       reporting_refreshed: reportingRefreshed,
       workspaces_purged: workspacesPurged,
+      jit_tickets_expired: jitTicketsExpired,
     }, span.context);
     return jsonResponse(200, {
       data: {
@@ -1240,6 +1322,7 @@ serve((req) => withRequestSpan(req, "POST /functions/job-worker", async (span, r
         failed,
         reporting_refreshed: reportingRefreshed,
         workspaces_purged: workspacesPurged,
+        jit_tickets_expired: jitTicketsExpired,
       },
     });
   } catch (error) {

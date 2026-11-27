@@ -9,8 +9,12 @@ import { isSuperAdminTokenBlockedBySessionRevocation } from "../_shared/superAdm
 import { resolveCorsHeaders } from "../_shared/cors.ts";
 import { readJsonBody } from "../_shared/requestBody.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
-import { loadLegacyBorrowerFields, resolveMixedSuperBorrowers } from "../_shared/superEncryptedBorrowers.ts";
-import { borrowerEncryptionModes } from "../_shared/borrowerEncryptionMode.ts";
+import { decryptSuperBorrowersWithJit } from "../_shared/superEncryptedBorrowers.ts";
+import { borrowerEncryptionEnabled } from "../_shared/borrowerEncryptionMode.ts";
+import {
+  recordJitTicketUse,
+  requireValidJitTicket,
+} from "../_shared/jitTicket.ts";
 import {
   optionalInteger,
   optionalIsoDate,
@@ -21,7 +25,7 @@ import {
 
 const baseCorsHeaders = {
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-request-id",
+    "authorization, x-client-info, apikey, content-type, x-request-id, x-itx-jit-ticket",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   Vary: "Origin",
 };
@@ -89,7 +93,7 @@ serve(async (req) => {
 
     const { data: profile, error: profileError } = await userClient
       .from("profiles")
-      .select("role, is_active")
+      .select("role, auth_email, is_active")
       .eq("id", user.id)
       .single();
 
@@ -168,12 +172,35 @@ serve(async (req) => {
     if (workspaceId !== "all" && !UUID_PATTERN.test(workspaceId)) {
       return jsonResponse(400, { error: "Invalid request" });
     }
+    const includePayload = payloadRecord.include_payload === true;
     const search = optionalText(payloadRecord.search, { maxLen: 120, transform: "lowercase" });
     const actionType = optionalText(payloadRecord.action_type, { maxLen: 40 }) || "all";
     const page = optionalInteger(payloadRecord.page, 1, 10_000, 1);
     const startAt = optionalIsoDate(payloadRecord.start_at);
     const endAt = optionalIsoDate(payloadRecord.end_at);
     const pageSize = optionalInteger(payloadRecord.page_size, 10, 200, 50);
+
+    let verifiedJit: { claims: import("../_shared/jitTicket.ts").JitTicketClaims; token: string } | null = null;
+    if (includePayload) {
+      if (workspaceId === "all") {
+        return jsonResponse(403, {
+          error: "A single workspace and valid JIT support ticket are required to view decrypted log payloads.",
+        });
+      }
+      const jitCheck = await requireValidJitTicket({
+        req,
+        adminClient,
+        actorId: user.id,
+        actorEmail: profile.auth_email ?? user.email ?? null,
+        workspaceId,
+        requiredScope: "read_only",
+        action: "super_logs_query_payload",
+      });
+      if (!jitCheck.ok) {
+        return jsonResponse(jitCheck.status, { error: jitCheck.error });
+      }
+      verifiedJit = { claims: jitCheck.claims, token: jitCheck.token };
+    }
 
     let query = adminClient
       .from("item_logs")
@@ -211,24 +238,64 @@ serve(async (req) => {
       performed_by: string | null;
     }>;
 
+    const workspaceIds = Array.from(new Set(rows.map((row) => row.workspace_id)));
+    const tenantResult = workspaceIds.length
+      ? await adminClient.from("workspaces").select("id, name").in("id", workspaceIds)
+      : { data: [], error: null };
+    const tenantById = new Map(
+      ((tenantResult.data ?? []) as Array<{ id: string; name: string }>).map((item) => [
+        item.id,
+        item,
+      ])
+    );
+
+    if (!includePayload || !verifiedJit) {
+      const metadataRows = rows
+        .map((row) => ({
+          ...row,
+          item: null,
+          borrower: null,
+          workspace: tenantById.get(row.workspace_id) ?? null,
+          pii_redacted: true,
+        }))
+        .filter((row) => {
+          if (!search) return true;
+          const haystack = [row.action_type, row.workspace?.name, row.workspace_id]
+            .filter(Boolean)
+            .join(" ")
+            .toLowerCase();
+          return haystack.includes(search);
+        });
+
+      return jsonResponse(200, {
+        data: metadataRows,
+        payload_mode: "metadata",
+        pii_redacted: true,
+        page,
+        page_size: pageSize,
+        count: metadataRows.length,
+      });
+    }
+
     const itemIds = Array.from(new Set(rows.map((row) => row.item_id)));
     const borrowerIds = Array.from(
       new Set(rows.map((row) => row.checked_out_by).filter(Boolean))
     ) as string[];
-    const workspaceIds = Array.from(new Set(rows.map((row) => row.workspace_id)));
 
-    const [itemResult, borrowerResult, tenantResult] = await Promise.all([
+    const [itemResult, borrowerResult] = await Promise.all([
       itemIds.length
-        ? adminClient.from("items").select("id, name, barcode").in("id", itemIds)
+        ? adminClient
+            .from("items")
+            .select("id, name, barcode")
+            .eq("workspace_id", workspaceId)
+            .in("id", itemIds)
         : Promise.resolve({ data: [], error: null }),
       borrowerIds.length
         ? adminClient
             .from("borrowers")
             .select("id,workspace_id,encrypted_data,nonce,auth_tag,key_version")
+            .eq("workspace_id", workspaceId)
             .in("id", borrowerIds)
-        : Promise.resolve({ data: [], error: null }),
-      workspaceIds.length
-        ? adminClient.from("workspaces").select("id, name").in("id", workspaceIds)
         : Promise.resolve({ data: [], error: null }),
     ]);
 
@@ -238,22 +305,41 @@ serve(async (req) => {
       )
     );
     if (borrowerResult.error) throw new Error("Borrower data unavailable");
-    const borrowerRows = borrowerResult.data ?? [];
-    const typedBorrowers = borrowerRows as unknown as Parameters<typeof resolveMixedSuperBorrowers>[0];
-    const modes = await borrowerEncryptionModes(adminClient, typedBorrowers.map(row => row.workspace_id), Deno.env.get("ITX_ENCRYPTED_BORROWERS_LOCAL") === "true");
-    const hydrated = await loadLegacyBorrowerFields(typedBorrowers, modes, async ids => {
-      const { data, error } = await adminClient.from("borrowers").select("id,workspace_id,username,borrower_id").in("id", ids);
-      if (error) throw new Error("Borrower data unavailable");
-      return data ?? [];
-    });
-    const borrowers = await resolveMixedSuperBorrowers(hydrated, modes, Deno.env.get("ITX_SGW_INTERNAL_SECRET") ?? "");
-    const borrowerById = new Map(borrowers.map((item) => [item.id, item]));
-    const tenantById = new Map(
-      ((tenantResult.data ?? []) as Array<{ id: string; name: string }>).map((item) => [
-        item.id,
-        item,
-      ])
+    const borrowerRows = (borrowerResult.data ?? []) as Array<{
+      id: string;
+      workspace_id: string;
+      encrypted_data: string | null;
+      nonce: string | null;
+      auth_tag: string | null;
+      key_version: number | null;
+    }>;
+    const encryptedWorkspace = await borrowerEncryptionEnabled(
+      adminClient,
+      workspaceId,
+      Deno.env.get("ITX_ENCRYPTED_BORROWERS_LOCAL") === "true",
     );
+    const jitGatewaySecret = Deno.env.get("ITX_SGW_JIT_SECRET") ?? "";
+    const decryptedBorrowers = borrowerRows.length && encryptedWorkspace
+      ? await decryptSuperBorrowersWithJit(
+          workspaceId,
+          borrowerRows,
+          jitGatewaySecret,
+          verifiedJit.token,
+        )
+      : [];
+    const borrowerById = new Map(decryptedBorrowers.map((item) => [item.id, item]));
+
+    await recordJitTicketUse({
+      req,
+      adminClient,
+      claims: verifiedJit.claims,
+      actorEmail: profile.auth_email ?? user.email ?? null,
+      action: "super_logs_query_payload",
+      metadata: {
+        row_count: rows.length,
+        decrypted_borrower_count: decryptedBorrowers.length,
+      },
+    });
 
     const mapped = rows
       .map((row) => ({
@@ -261,6 +347,7 @@ serve(async (req) => {
         item: itemById.get(row.item_id) ?? null,
         borrower: row.checked_out_by && borrowerById.get(row.checked_out_by)?.workspace_id === row.workspace_id ? borrowerById.get(row.checked_out_by) ?? null : null,
         workspace: tenantById.get(row.workspace_id) ?? null,
+        pii_redacted: false,
       }))
       .filter((row) => {
         if (!search) return true;
@@ -280,6 +367,8 @@ serve(async (req) => {
 
     return jsonResponse(200, {
       data: mapped,
+      payload_mode: "decrypted",
+      pii_redacted: false,
       page,
       page_size: pageSize,
       count: mapped.length,

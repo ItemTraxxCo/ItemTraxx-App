@@ -3,6 +3,7 @@ import {
   resetPostHogIdentity,
   setPostHogIdentity,
 } from "../services/posthogIdentityLifecycle";
+import { clearActiveJitSession } from "./jitAccessState";
 
 type UserRole = "tenant_account" | "individual_account" | "workspace_admin" | "super_admin";
 
@@ -147,6 +148,7 @@ export const clearAdminVerification = () => {
 };
 
 export const clearAuthState = (markInitialized = false) => {
+  clearActiveJitSession();
   Object.assign(authState, {
     ...defaultState,
     isInitialized: markInitialized ? true : defaultState.isInitialized,

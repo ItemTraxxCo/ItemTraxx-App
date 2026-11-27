@@ -39,3 +39,30 @@ export async function callGateway(
     throw new Error('Gateway unavailable');
   }
 }
+
+export async function callJitGateway(
+  operation: 'encrypt' | 'decrypt',
+  body: Record<string, unknown>,
+  secret: string,
+  jitToken: string,
+  fetcher: typeof fetch = fetch,
+): Promise<Record<string, unknown>> {
+  if (secret.length < 32 || !jitToken.trim()) throw new Error('Gateway unavailable');
+  const origin = resolveGatewayOrigin(Deno.env.get('ITX_SGW_LOCAL_ORIGIN'), Deno.env.get('SUPABASE_URL'));
+  const response = await fetcher(`${origin}/v1/crypto/jit/${operation}`, {
+    method: 'POST',
+    headers: {
+      authorization: `Bearer ${secret}`,
+      'content-type': 'application/json',
+      'x-itx-jit-ticket': jitToken.trim(),
+    },
+    body: JSON.stringify(body),
+    redirect: 'error',
+    signal: AbortSignal.timeout(5000),
+  });
+  if (response.status === 403) throw new Error('JIT ticket rejected by gateway');
+  if (!response.ok) throw new Error('Gateway unavailable');
+  const result: unknown = await response.json();
+  if (!result || typeof result !== 'object' || Array.isArray(result)) throw new Error('Gateway unavailable');
+  return result as Record<string, unknown>;
+}

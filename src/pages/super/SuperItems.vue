@@ -16,8 +16,16 @@
       </div>
     </div>
 
+    <SuperJitAccessBar
+      :workspaces="workspaces"
+      :default-workspace-id="workspaceFilter"
+      @ticket-granted="handleJitGranted"
+      @ticket-cleared="handleJitCleared"
+    />
+
     <section class="sa-panel">
       <h2>Create Item</h2>
+      <p v-if="!hasBreakGlassForForm" class="muted">Break-glass JIT ticket required to create, update, or delete tenant items.</p>
       <form class="form" @submit.prevent="handleCreate">
         <label>Workspace<select v-model="formWorkspaceId"><option value="">Select workspace</option><option v-for="t in workspaces" :key="t.id" :value="t.id">{{ t.name }}</option></select></label>
         <label>Name<input v-model="formName" type="text" /></label>
@@ -40,13 +48,29 @@
         <input v-model="search" type="text" placeholder="Search" />
         <button type="button" class="sa-btn" @click="loadItem">Search</button>
       </div>
-      <p class="muted">Showing {{ filteredItem.length }} of {{ items.length }} items.</p>
+      <p class="muted">
+        <template v-if="hasJitReadForFilter">Showing {{ filteredItem.length }} of {{ items.length }} items.</template>
+        <template v-else>Showing unencrypted item metadata only ({{ metadataRows.length }} records). Request a JIT ticket for one workspace to view item details.</template>
+      </p>
       <div class="form-actions">
-        <button type="button" class="sa-btn" @click="exportCsv">Export CSV</button>
-        <button type="button" class="sa-btn" @click="exportPdf">Export PDF</button>
+        <button type="button" class="sa-btn" :disabled="!hasJitReadForFilter" @click="exportCsv">Export CSV</button>
+        <button type="button" class="sa-btn" :disabled="!hasJitReadForFilter" @click="exportPdf">Export PDF</button>
       </div>
       <SkeletonLoader v-if="isLoading" variant="table" :rows="6" :columns="5" label="Loading all items" />
       <p v-else-if="error" class="sa-error" v-app-toast-error>{{ error }}</p>
+      <div v-else-if="!hasJitReadForFilter" class="sa-table-wrap">
+        <table class="sa-table">
+          <thead><tr><th>Item ID</th><th>Workspace</th><th>Status</th><th>Created</th></tr></thead>
+          <tbody>
+            <tr v-for="row in metadataRows" :key="row.id">
+              <td><code>{{ row.id }}</code></td>
+              <td>{{ workspaceNameById.get(row.workspace_id) || row.workspace_id }}</td>
+              <td>{{ formatItemStatus(row.status) }}</td>
+              <td>{{ row.created_at }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
       <div v-else class="sa-table-wrap">
         <table class="sa-table">
           <thead><tr><th>Name</th><th>Workspace</th><th>Barcode</th><th>Status</th><th>Actions</th></tr></thead>
@@ -95,19 +119,31 @@ import { computed, onMounted, ref } from "vue";
 import { RouterLink, useRouter } from "vue-router";
 import SkeletonLoader from "../../components/SkeletonLoader.vue";
 import StepUpModal from "../../components/StepUpModal.vue";
+import SuperJitAccessBar from "../../components/SuperJitAccessBar.vue";
 import {
   handleSuperAdminUnauthorized,
   isUnauthorizedError,
 } from "../../services/authErrorHandling";
-import { createSuperItem, deleteSuperItem, listSuperItem, updateSuperItem, type SuperItemRecord } from "../../services/superItemService";
+import {
+  createSuperItem,
+  deleteSuperItem,
+  listSuperItem,
+  listSuperItemMetadata,
+  updateSuperItem,
+  type SuperItemMetadataRecord,
+  type SuperItemRecord,
+} from "../../services/superItemService";
 import { listWorkspaces as listWorkspaces, type SuperWorkspace as SuperWorkspace } from "../../services/superWorkspaceService";
 import { exportRowsToCsv, exportRowsToPdf } from "../../services/exportService";
 import { toUserFacingErrorMessage } from "../../services/appErrors";
 import { formatItemStatus, ITEM_STATUS_OPTIONS } from "../../utils/itemStatus";
+import { getActiveJitTokenForWorkspace, useActiveJitSession, type JitTicketScope } from "../../store/jitAccessState";
 
 const router = useRouter();
+const { activeJitSession } = useActiveJitSession();
 const workspaces = ref<SuperWorkspace[]>([]);
 const items = ref<SuperItemRecord[]>([]);
+const metadataRows = ref<SuperItemMetadataRecord[]>([]);
 const workspaceFilter = ref("all");
 const statusFilter = ref("all");
 const search = ref("");
@@ -136,6 +172,28 @@ let toastTimer: number | null = null;
 const itemStatusOptions = ITEM_STATUS_OPTIONS;
 
 const workspaceNameById = computed(() => new Map(workspaces.value.map((t) => [t.id, t.name])));
+const hasJitReadForFilter = computed(() => {
+  void activeJitSession.value;
+  return workspaceFilter.value !== "all" && Boolean(getActiveJitTokenForWorkspace(workspaceFilter.value, "read_only"));
+});
+const hasBreakGlassForForm = computed(() => {
+  void activeJitSession.value;
+  return Boolean(formWorkspaceId.value && getActiveJitTokenForWorkspace(formWorkspaceId.value, "break_glass"));
+});
+
+const handleJitGranted = async (payload: { workspaceId: string; scope: JitTicketScope }) => {
+  workspaceFilter.value = payload.workspaceId;
+  if (payload.scope === "break_glass" && !formWorkspaceId.value) {
+    formWorkspaceId.value = payload.workspaceId;
+  }
+  await loadItem();
+};
+
+const handleJitCleared = async () => {
+  items.value = [];
+  editItem.value = null;
+  await loadItem();
+};
 const filteredItem = computed(() => {
   if (statusFilter.value === "all") return items.value;
   return items.value.filter((item) => item.status === statusFilter.value);
@@ -169,6 +227,11 @@ const loadItem = async () => {
   isLoading.value = true;
   error.value = "";
   try {
+    if (!hasJitReadForFilter.value) {
+      items.value = [];
+      metadataRows.value = await listSuperItemMetadata(workspaceFilter.value);
+      return;
+    }
     items.value = await listSuperItem(workspaceFilter.value, search.value.trim());
   } catch (err) {
     if (isUnauthorizedError(err)) {

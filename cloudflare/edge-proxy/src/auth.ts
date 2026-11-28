@@ -38,6 +38,11 @@ import {
   normalizeBetterAuthPathname,
 } from "./authCaptcha.ts";
 import { buildAdminLoginAuditRecord } from "./authSessionAudit.ts";
+import {
+  applySessionUpdateLifetimeCap,
+  SESSION_ROLLING_EXPIRES_IN_SECONDS,
+  SESSION_UPDATE_AGE_SECONDS,
+} from "./sessionLifetime.ts";
 
 export { normalizeBetterAuthCaptchaRequest } from "./authCaptcha.ts";
 
@@ -607,13 +612,14 @@ export const getBetterAuth = (rawEnv: Env) => {
         sendPasswordResetEmail({ env, user, url, request }),
     },
     session: {
-      expiresIn: 60 * 60 * 24 * 7,
-      updateAge: 60 * 60 * 24,
+      expiresIn: SESSION_ROLLING_EXPIRES_IN_SECONDS,
+      updateAge: SESSION_UPDATE_AGE_SECONDS,
       freshAge: 0, // An active session should not trigger periodic re-authentication.
     },
     databaseHooks: {
       session: {
         create: {
+          before: async (session) => applySessionUpdateLifetimeCap(session, session.createdAt),
           after: async (session) => {
             try {
               const { data: profile, error: profileError } = await dataClient
@@ -641,6 +647,13 @@ export const getBetterAuth = (rawEnv: Env) => {
               });
             }
           },
+        },
+        update: {
+          before: async (sessionUpdate, context) =>
+            applySessionUpdateLifetimeCap(
+              sessionUpdate,
+              context?.context?.session?.session?.createdAt,
+            ),
         },
       },
     },

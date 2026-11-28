@@ -362,7 +362,8 @@
                 "properties": {
                   "device_id": {
                     "type": "string",
-                    "minLength": 1
+                    "minLength": 1,
+                    "maxLength": 128
                   },
                   "device_label": {
                     "type": "string",
@@ -408,7 +409,8 @@
                 "properties": {
                   "device_id": {
                     "type": "string",
-                    "minLength": 1
+                    "minLength": 1,
+                    "maxLength": 128
                   },
                   "device_label": {
                     "type": "string",
@@ -454,7 +456,8 @@
                 "properties": {
                   "device_id": {
                     "type": "string",
-                    "minLength": 1
+                    "minLength": 1,
+                    "maxLength": 128
                   },
                   "device_label": {
                     "type": "string",
@@ -500,7 +503,8 @@
                 "properties": {
                   "device_id": {
                     "type": "string",
-                    "minLength": 1
+                    "minLength": 1,
+                    "maxLength": 128
                   },
                   "device_label": {
                     "type": "string",
@@ -577,7 +581,8 @@
                 "properties": {
                   "device_id": {
                     "type": "string",
-                    "minLength": 1
+                    "minLength": 1,
+                    "maxLength": 128
                   },
                   "device_label": {
                     "type": "string",
@@ -623,7 +628,8 @@
                 "properties": {
                   "device_id": {
                     "type": "string",
-                    "minLength": 1
+                    "minLength": 1,
+                    "maxLength": 128
                   },
                   "device_label": {
                     "type": "string",
@@ -675,7 +681,8 @@
                 "properties": {
                   "device_id": {
                     "type": "string",
-                    "minLength": 1
+                    "minLength": 1,
+                    "maxLength": 128
                   },
                   "device_label": {
                     "type": "string",
@@ -721,7 +728,8 @@
                 "properties": {
                   "device_id": {
                     "type": "string",
-                    "minLength": 1
+                    "minLength": 1,
+                    "maxLength": 128
                   },
                   "device_label": {
                     "type": "string",
@@ -767,7 +775,8 @@
                 "properties": {
                   "device_id": {
                     "type": "string",
-                    "minLength": 1
+                    "minLength": 1,
+                    "maxLength": 128
                   },
                   "device_label": {
                     "type": "string",
@@ -813,7 +822,8 @@
                 "properties": {
                   "device_id": {
                     "type": "string",
-                    "minLength": 1
+                    "minLength": 1,
+                    "maxLength": 128
                   },
                   "device_label": {
                     "type": "string",
@@ -859,7 +869,8 @@
                 "properties": {
                   "device_id": {
                     "type": "string",
-                    "minLength": 1
+                    "minLength": 1,
+                    "maxLength": 128
                   },
                   "device_label": {
                     "type": "string",
@@ -910,7 +921,8 @@
                 "properties": {
                   "device_id": {
                     "type": "string",
-                    "minLength": 1
+                    "minLength": 1,
+                    "maxLength": 128
                   },
                   "device_label": {
                     "type": "string",
@@ -1620,7 +1632,8 @@
                           "type": "string"
                         },
                         "device_id": {
-                          "type": "string"
+                          "type": "string",
+                          "maxLength": 128
                         },
                         "device_label": {
                           "type": [
@@ -4716,7 +4729,8 @@
                 "properties": {
                   "device_id": {
                     "type": "string",
-                    "minLength": 1
+                    "minLength": 1,
+                    "maxLength": 128
                   },
                   "device_label": {
                     "type": [
@@ -4777,7 +4791,8 @@
                 "properties": {
                   "device_id": {
                     "type": "string",
-                    "minLength": 1
+                    "minLength": 1,
+                    "maxLength": 128
                   },
                   "device_label": {
                     "type": [
@@ -4933,7 +4948,8 @@
                 "properties": {
                   "device_id": {
                     "type": "string",
-                    "minLength": 1
+                    "minLength": 1,
+                    "maxLength": 128
                   },
                   "device_label": {
                     "type": [
@@ -4998,7 +5014,8 @@
                 "properties": {
                   "device_id": {
                     "type": "string",
-                    "minLength": 1
+                    "minLength": 1,
+                    "maxLength": 128
                   },
                   "device_label": {
                     "type": [
@@ -6062,7 +6079,8 @@
                           "type": "string"
                         },
                         "device_id": {
-                          "type": "string"
+                          "type": "string",
+                          "maxLength": 128
                         },
                         "device_label": {
                           "type": [
@@ -9168,7 +9186,8 @@
                 "properties": {
                   "device_id": {
                     "type": "string",
-                    "minLength": 1
+                    "minLength": 1,
+                    "maxLength": 128
                   },
                   "device_label": {
                     "type": "string",
@@ -9214,7 +9233,8 @@
                 "properties": {
                   "device_id": {
                     "type": "string",
-                    "minLength": 1
+                    "minLength": 1,
+                    "maxLength": 128
                   },
                   "device_label": {
                     "type": "string",
@@ -9266,7 +9286,8 @@
                 "properties": {
                   "device_id": {
                     "type": "string",
-                    "minLength": 1
+                    "minLength": 1,
+                    "maxLength": 128
                   },
                   "device_label": {
                     "type": "string",
@@ -9322,7 +9343,8 @@
                 "properties": {
                   "device_id": {
                     "type": "string",
-                    "minLength": 1
+                    "minLength": 1,
+                    "maxLength": 128
                   },
                   "device_label": {
                     "type": "string",
@@ -9374,7 +9396,8 @@
                 "properties": {
                   "device_id": {
                     "type": "string",
-                    "minLength": 1
+                    "minLength": 1,
+                    "maxLength": 128
                   },
                   "device_label": {
                     "type": "string",

@@ -51,3 +51,23 @@ fnm exec --using 24.22.3 -- node --test cloudflare/sgw/*.test.mjs
 ```
 
 The SQL assertions in `supabase/tests/sgw_key_lifecycle_assertions.sql` require an isolated database with the migration and a workspace fixture. No tests in this directory establish production readiness.
+
+## Instant key revocation & cryptographic shredding runbook (ITX-103)
+
+1. **Trigger immediate key revocation** (deletes wrapped DEK + pepper from Cloudflare KV `KEYS`, deletes `kms/v1/<workspace_id>.json` from isolated R2 bucket `itemtraxx-kms-backups`, writes terminal tombstone `kms/revoked/<workspace_id>.json`, and marks `public.sgw_workspace_key_lifecycle.state = 'revoked'`):
+   ```sh
+   curl -fsS -X POST https://sgw.itemtraxx.com/v1/kms/revoke-tenant-keys \
+     -H "Authorization: Bearer ${KMS_LIFECYCLE_SECRET}" \
+     -H "Content-Type: application/json" \
+     -d '{"workspace_id":"<workspace-uuid>"}'
+   ```
+   Expected response: `{"status":"revoked"}`. If the request returns `503`, the workspace remains in `revoking` (all crypto operations already fail closed); retry the exact same POST until `200`.
+2. **Verify shredding across live KV, isolated KMS backup, and DB backups**:
+   - Confirm `<workspace-uuid>` is absent from Cloudflare KV namespace `KEYS` (re-check after Cloudflare KV's 60s eventual-consistency window).
+   - Confirm `kms/v1/<workspace-uuid>.json` is absent from `itemtraxx-kms-backups` and `kms/revoked/<workspace-uuid>.json` exists with `"status":"revoked"`.
+   - Confirm `public.sgw_workspace_key_lifecycle` shows `state = 'revoked'`.
+   - Confirm any decrypt request against live or restored DB ciphertext returns HTTP `404`. Because DB backups (`itemtraxx-db-backups`) contain only ciphertext and never hold `MASTER_KEK` or wrapped DEKs, every historical DB backup for that workspace is permanently unrecoverable.
+3. **DR restore reconciliation**:
+   - Before restoring any DB backup, set `SGW_RESTORE_HOLD=true` and `SGW_PROVISIONING_ENABLED=false` on the SGW Worker.
+   - Restore only active (non-tombstoned) wrapped keys from `itemtraxx-kms-backups/kms/v1/` into KV; **never** restore or reprovision any workspace listed under `kms/revoked/`.
+   - Automated drill coverage: `node --test cloudflare/sgw/shredding-drill.test.mjs`.

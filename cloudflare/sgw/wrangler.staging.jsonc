@@ -8,7 +8,8 @@
   "preview_urls": false,
   "vars": {
     "SUPABASE_URL": "https://nwuhjxicaopkmqydjlas.supabase.co",
-    "SGW_PROVISIONING_ENABLED": "false"
+    "SGW_PROVISIONING_ENABLED": "false",
+    "SGW_REQUIRE_KMS_BACKUP": "true"
   },
   "kv_namespaces": [
     { "binding": "KEYS", "id": "d5f35be5620148d89c68218cd4e8c520" }

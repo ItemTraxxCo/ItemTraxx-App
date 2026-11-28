@@ -11,7 +11,8 @@
     }
   },
   "vars": {
-    "SUPABASE_URL": "https://mlaspkufocikfcbjgpof.supabase.co" // prod db url
+    "SUPABASE_URL": "https://mlaspkufocikfcbjgpof.supabase.co", // prod db url
+    "SGW_REQUIRE_KMS_BACKUP": "true"
   },
   "routes": [
     {

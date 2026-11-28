@@ -196,6 +196,11 @@ export async function handleRequest(
         (typeof env.SGW_PROVISIONING_WORKSPACE !== 'string' || !UUID.test(env.SGW_PROVISIONING_WORKSPACE) || env.SGW_PROVISIONING_WORKSPACE.toLowerCase() !== body.workspace_id)) {
       return json(503, { error: 'Key provisioning disabled' });
     }
+    if (env.SGW_REQUIRE_KMS_BACKUP === 'true' && !env.KMS_BACKUPS) {
+      return json(503, { error: 'Isolated KMS backup store unavailable' });
+    }
+    const backupKey = `kms/v1/${body.workspace_id}.json`;
+    const tombstoneKey = `kms/revoked/${body.workspace_id}.json`;
     try {
       if (!await transition(provision ? 'claim_provision' : 'claim_revoke', body.workspace_id, env)) {
         if (provision) return json(409, { error: 'Lifecycle transition unavailable' });
@@ -204,11 +209,34 @@ export async function handleRequest(
       }
       if (provision) {
         if (await env.KEYS.get(body.workspace_id) !== null) return json(409, { error: 'Key already exists; reconciliation required' });
+        if (env.KMS_BACKUPS) {
+          if (await env.KMS_BACKUPS.head(tombstoneKey) !== null) return json(409, { error: 'Key previously revoked; cannot reprovision' });
+          if (await env.KMS_BACKUPS.head(backupKey) !== null) return json(409, { error: 'Key backup already exists; reconciliation required' });
+        }
         const kek = Uint8Array.from(atob(env.MASTER_KEK), (char) => char.charCodeAt(0));
         const wrapped = await generateWorkspaceKeys(kek, body.workspace_id);
-        await env.KEYS.put(body.workspace_id, JSON.stringify(wrapped));
+        const serialized = JSON.stringify(wrapped);
+        await env.KEYS.put(body.workspace_id, serialized);
+        if (env.KMS_BACKUPS) {
+          await env.KMS_BACKUPS.put(backupKey, serialized, {
+            httpMetadata: { contentType: 'application/json' },
+            customMetadata: { workspace_id: body.workspace_id, key_version: String(wrapped.version) },
+          });
+        }
       } else {
         await env.KEYS.delete(body.workspace_id);
+        if (env.KMS_BACKUPS) {
+          await env.KMS_BACKUPS.delete(backupKey);
+          await env.KMS_BACKUPS.put(
+            tombstoneKey,
+            JSON.stringify({
+              workspace_id: body.workspace_id,
+              revoked_at: new Date(nowMs).toISOString(),
+              status: 'revoked',
+            }),
+            { httpMetadata: { contentType: 'application/json' } },
+          );
+        }
       }
       if (!await transition(provision ? 'finish_provision' : 'finish_revoke', body.workspace_id, env)) {
         if (provision || !await transition('is_revoked', body.workspace_id, env)) throw new Error('Incomplete transition');

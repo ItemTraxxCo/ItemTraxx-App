@@ -11,7 +11,8 @@
     }
   },
   "vars": {
-    "SUPABASE_URL": "https://mlaspkufocikfcbjgpof.supabase.co" // prod db url
+    "SUPABASE_URL": "https://mlaspkufocikfcbjgpof.supabase.co", // prod db url
+    "SGW_REQUIRE_KMS_BACKUP": "true"
   },
   "routes": [
     {
@@ -39,6 +40,12 @@
     {
       "binding": "KEYS",
       "id": "950e0d5b30d54475b0afbfcbc990c72b" // kv namespace for the keys
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "KMS_BACKUPS",
+      "bucket_name": "itemtraxx-kms-backups"
     }
   ]
 }

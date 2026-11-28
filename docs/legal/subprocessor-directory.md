@@ -1,21 +1,20 @@
 # ItemTraxx Subprocessor Directory
 
-**Last updated:** [[EFFECTIVE_DATE]]  
+**Last updated:** November 27, 2026  
 **Provider:** [[ENTITY_DESCRIPTION]] ("ItemTraxx," "we," "us")  
 **Contact:** privacy@itemtraxx.com
 
 ItemTraxx uses the service providers below to deliver the Service. This directory lists every provider that may process personal information on behalf of ItemTraxx and its customers, what it does, and what information it can receive. It covers Customer Data across customer workspaces (such as asset records, borrower and checkout history, and account data for administrators and users). It supports the commitments in our [Privacy Policy](privacy-policy.md), [Student Privacy Notice and FERPA / SOPIPA Compliance Addendum](student-privacy-notice.md), and customer [Data Processing Addendum](dpa.md).
 
-For educational customers subject to FERPA, SOPIPA, or related student privacy standards, our [Student Privacy Notice and FERPA / SOPIPA Compliance Addendum](student-privacy-notice.md) also applies. In those workspaces, Supabase, Cloudflare, Google Cloud, and GitHub (which stores backups solely in encrypted form) are the only subprocessors authorized to store or process Student Data. Operational alerts, telemetry, and error logs do not contain borrower or student records. Customers are advised not to submit borrower or student personal data through support channels
+For educational customers subject to FERPA, SOPIPA, or related student privacy standards, our [Student Privacy Notice and FERPA / SOPIPA Compliance Addendum](student-privacy-notice.md) also applies. In those workspaces, Supabase, Cloudflare, and Google Cloud are the only subprocessors authorized to store or process Student Data. Operational alerts, telemetry, and error logs do not contain borrower or student records. Customers are advised not to submit borrower or student personal data through support channels
 
 ## 1. Subprocessors
 
 | Vendor | Purpose | Data transferred | Location |
 |---|---|---|---|
 | **Supabase** | Database, server functions, and file storage | All workspace data, including Student Data, staff and account data, support attachments, and error reports | [[DATABASE_REGION]] |
-| **Cloudflare** | Network delivery, DNS, and security | Request traffic in transit (including Student Data when staff use the app) and request metadata such as IP address, URL, and headers | Global edge network |
-| **Google Cloud** | Runs the scheduled database backup job for disaster recovery | Copies of the data held in Supabase, including Student Data, while a backup is created and encrypted | [[BACKUP_LOCATION]] |
-| **GitHub** | Private storage of encrypted database backups for disaster recovery | Encrypted copies of the production database, including Student Data; GitHub cannot read the contents | United States |
+| **Cloudflare** | Network delivery, DNS, security, workspace encryption key management, and private storage of encrypted database backups for disaster recovery | Request traffic in transit (including Student Data when staff use the app), request metadata such as IP address, URL, and headers, wrapped workspace encryption keys, and encrypted copies of the production database | Global edge network (encrypted backups stored in [[BACKUP_LOCATION]]) |
+| **Google Cloud** | Runs the scheduled database backup and restore-verification jobs for disaster recovery | Copies of the data held in Supabase, including Student Data, while a backup is created, encrypted, verified, and briefly retained in encrypted form | [[BACKUP_LOCATION]] |
 | **Vercel** | Web application hosting and, with consent, web analytics | Request metadata; page-view and page-speed data | Global edge network |
 | **Better Auth, Inc.** | Sign-in security services | Sign-in event data such as email, IP address, and device signals | United States |
 | **PostHog** | Security and operational monitoring; product analytics with consent | Operational and diagnostic information; product usage and session replay data only with consent | United States |
@@ -26,7 +25,7 @@ For educational customers subject to FERPA, SOPIPA, or related student privacy s
 
 ## 2. Tools that do not receive customer data
 
-Our source control, build, and security tools (such as GitHub's code repositories and build service, and Aikido Security for code analysis, cloud configuration scanning, and penetration testing) receive source code, dependency information, and system metadata, not customer data. GitHub's separate role in storing encrypted backups is listed above. A customer's own identity provider, if it uses single sign-on, is the customer's vendor, not ours
+Our source control, build, operational-health, and security tools (such as GitHub's code repositories and build/monitoring service, and Aikido Security for code analysis, cloud configuration scanning, and penetration testing) receive source code, dependency information, and non-customer operational metadata, not Customer Data or Student Data. A customer's own identity provider, if it uses single sign-on, is the customer's vendor, not ours
 
 ## 3. Changes to this directory
 
@@ -40,3 +39,4 @@ Our source control, build, and security tools (such as GitHub's code repositorie
 | Date | Change |
 |---|---|
 | November 4, 2026 | Initial publication of this directory. |
+| November 27, 2026 | Moved encrypted database backup storage from GitHub to Cloudflare (US-West); moved automated restore verification to the dedicated Google Cloud backup host; removed GitHub from the subprocessor list (GitHub no longer receives or stores Customer Data or Student Data). |

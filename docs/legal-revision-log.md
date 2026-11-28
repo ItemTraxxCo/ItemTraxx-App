@@ -176,3 +176,12 @@ The brief lists 7 checks; "Checks 1-11" in the output instructions has no defini
 - Student Data: Student Data Addendum 4.2, Part A, Privacy 5.1, and the directory intro now say providers not listed as processing Student Data do not receive it from ItemTraxx, and users must not enter Student Data into support channels. The "may incidentally receive" clause is removed. The words "under any circumstances" were not used because a user typing student information into a support chat or screenshot is outside our control; the user prohibition and deletion commitment cover that case.
 - Titles: Cookie H1 is "ItemTraxx Cookie Notice" (the "ItemTraxx" prefix matches the other six H1s); the registry, route title, prerender, Terms 2 and 7, and the directory use "Student Privacy Notice and FERPA / SOPIPA Compliance Addendum" verbatim. Part A keeps the short name "Student Privacy Notice".
 - Terms 8: service levels apply only where an enterprise Order Form or other signed agreement expressly provides them. Terms 14: "trial account" removed; individual accounts remain because the product has them. No trial feature exists in the code.
+
+### Backup storage & subprocessor migration 2026-11-27
+
+- Moved encrypted database backup storage from GitHub Releases to Cloudflare R2 (`wnam`, 30-day bucket lifecycle expiration rule).
+- Moved scheduled backup execution and daily restore/RLS verification directly onto the dedicated Google Cloud VM (`us-west1-b`, hardened `systemd` timers `itx-backup.timer` and `itx-restore-verify.timer`).
+- Purged all 62 legacy GitHub Releases and removed database credentials and the encryption passphrase from `ItemTraxxCo/itemtraxx-backups`; GitHub Actions now performs only non-customer-data VM liveness and `.auth` hash sidecar freshness checks.
+- `subprocessor-directory.md`: removed GitHub from Section 1 (`Subprocessors`), updated Section 2 (`Tools that do not receive customer data`), updated intro to name only Supabase, Cloudflare, and Google Cloud for Student Data, updated Cloudflare and Google Cloud rows, and added 2026-11-27 change-log entry.
+- `dpa.md`: updated Annex A `Locations` to remove GitHub backup storage reference (`backups created, verified, and stored in encrypted form in [[BACKUP_LOCATION]]`).
+- `privacy-policy.md`: updated Section 5.1 to list only Supabase, Cloudflare, and Google Cloud for Student Data and state that GitHub does not receive production customer data.

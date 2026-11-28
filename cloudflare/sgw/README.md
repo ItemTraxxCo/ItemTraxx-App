@@ -14,7 +14,7 @@ The deploy script selects this Worker's Wrangler configuration explicitly and pr
 
 ## Local lifecycle implementation
 
-The Worker expects the `KEYS` KV binding and four secrets: `MASTER_KEK` (base64-encoded 32-byte key), `KMS_INTERNAL_SECRET` (crypto bearer), `KMS_LIFECYCLE_SECRET` (separate, privileged provisioning/revocation bearer), and `SUPABASE_SERVICE_ROLE_KEY` (a Supabase secret API key, `sb_secret_…`). For Super Admin JIT delegated support (`/v1/crypto/jit/decrypt` and `/v1/crypto/jit/encrypt`), also configure `KMS_JIT_SECRET` (dedicated >=32-char bearer secret isolated from `KMS_INTERNAL_SECRET`) and `ITX_JIT_TICKET_PUBLIC_JWK` (ES256 P-256 public JWK used to verify `X-ITX-JIT-Ticket` tokens before consulting `verify_jit_support_ticket` and unwrapping workspace keys). Despite its binding name, `SUPABASE_SERVICE_ROLE_KEY` should contain the dedicated new API secret key, not the legacy service-role JWT. `SUPABASE_URL` is an HTTPS configuration value. The API secret grants broad database access; store it only as a Worker secret and assess a narrower coordinator credential before deployment. Do not expose any bearer, public/private JWK, or database credentials to browsers or log them.
+The Worker expects the `KEYS` KV binding and four secrets: `MASTER_KEK` (base64-encoded 32-byte key), `KMS_INTERNAL_SECRET` (crypto bearer), `KMS_LIFECYCLE_SECRET` (separate, privileged provisioning/revocation bearer), and `SUPABASE_SERVICE_ROLE_KEY` (a Supabase secret API key, `sb_secret_…`). For isolated KMS backup and instant cryptographic shredding (`ITX-103`), bind a dedicated R2 bucket `KMS_BACKUPS` (`itemtraxx-kms-backups` for prod, `itemtraxx-kms-backups-staging` for staging — separate from DB backups and without an immutable retention lock) and set `SGW_REQUIRE_KMS_BACKUP=true`: provisioning mirrors wrapped keys to `kms/v1/<workspace_id>.json`, and revocation deletes both KV and `kms/v1/<workspace_id>.json` while writing a revocation tombstone at `kms/revoked/<workspace_id>.json` that blocks reprovisioning even after a stale DB restore. For Super Admin JIT delegated support (`/v1/crypto/jit/decrypt` and `/v1/crypto/jit/encrypt`), also configure `KMS_JIT_SECRET` (dedicated >=32-char bearer secret isolated from `KMS_INTERNAL_SECRET`) and `ITX_JIT_TICKET_PUBLIC_JWK` (ES256 P-256 public JWK used to verify `X-ITX-JIT-Ticket` tokens before consulting `verify_jit_support_ticket` and unwrapping workspace keys). Despite its binding name, `SUPABASE_SERVICE_ROLE_KEY` should contain the dedicated new API secret key, not the legacy service-role JWT. `SUPABASE_URL` is an HTTPS configuration value. The API secret grants broad database access; store it only as a Worker secret and assess a narrower coordinator credential before deployment. Do not expose any bearer, public/private JWK, or database credentials to browsers or log them.
 
 `POST /v1/kms/generate-tenant-keys` and `/v1/kms/revoke-tenant-keys` accept `{ "workspace_id": "<uuid>" }`. Neither returns key material. The service-role-only lifecycle RPC maintains a durable workspace claim with states `provisioning`, `active`, `revoking`, and `revoked`. An atomic unique insert provides one provisioning claimant. Cryptographic requests check for the active state. Revocation claims the state before deleting KV. The lifecycle row survives workspace deletion; callers must explicitly invoke revocation during the workspace deletion workflow, which is not integrated yet.
 
@@ -51,3 +51,23 @@ fnm exec --using 24.22.3 -- node --test cloudflare/sgw/*.test.mjs
 ```
 
 The SQL assertions in `supabase/tests/sgw_key_lifecycle_assertions.sql` require an isolated database with the migration and a workspace fixture. No tests in this directory establish production readiness.
+
+## Instant key revocation & cryptographic shredding runbook (ITX-103)
+
+1. **Trigger immediate key revocation** (deletes wrapped DEK + pepper from Cloudflare KV `KEYS`, deletes `kms/v1/<workspace_id>.json` from isolated R2 bucket `itemtraxx-kms-backups`, writes terminal tombstone `kms/revoked/<workspace_id>.json`, and marks `public.sgw_workspace_key_lifecycle.state = 'revoked'`):
+   ```sh
+   curl -fsS -X POST https://sgw.itemtraxx.com/v1/kms/revoke-tenant-keys \
+     -H "Authorization: Bearer ${KMS_LIFECYCLE_SECRET}" \
+     -H "Content-Type: application/json" \
+     -d '{"workspace_id":"<workspace-uuid>"}'
+   ```
+   Expected response: `{"status":"revoked"}`. If the request returns `503`, the workspace remains in `revoking` (all crypto operations already fail closed); retry the exact same POST until `200`.
+2. **Verify shredding across live KV, isolated KMS backup, and DB backups**:
+   - Confirm `<workspace-uuid>` is absent from Cloudflare KV namespace `KEYS` (re-check after Cloudflare KV's 60s eventual-consistency window).
+   - Confirm `kms/v1/<workspace-uuid>.json` is absent from `itemtraxx-kms-backups` and `kms/revoked/<workspace-uuid>.json` exists with `"status":"revoked"`.
+   - Confirm `public.sgw_workspace_key_lifecycle` shows `state = 'revoked'`.
+   - Confirm any decrypt request against live or restored DB ciphertext returns HTTP `404`. Because DB backups (`itemtraxx-db-backups`) contain only ciphertext and never hold `MASTER_KEK` or wrapped DEKs, every historical DB backup for that workspace is permanently unrecoverable.
+3. **DR restore reconciliation**:
+   - Before restoring any DB backup, set `SGW_RESTORE_HOLD=true` and `SGW_PROVISIONING_ENABLED=false` on the SGW Worker.
+   - Restore only active (non-tombstoned) wrapped keys from `itemtraxx-kms-backups/kms/v1/` into KV; **never** restore or reprovision any workspace listed under `kms/revoked/`.
+   - Automated drill coverage: `node --test cloudflare/sgw/shredding-drill.test.mjs`.

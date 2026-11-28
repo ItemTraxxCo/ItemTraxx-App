@@ -100,6 +100,31 @@ Deno.test("listActiveBetterAuthSessionIds returns only live matching rows", asyn
   assertEquals(result.relationMissing, false);
 });
 
+Deno.test("isBetterAuthSessionActive enforces the 90-day absolute session cap", async () => {
+  const dayMs = 24 * 60 * 60 * 1000;
+  const recent = new Date(Date.now() - 89 * dayMs).toISOString();
+  const expiredByCap = new Date(Date.now() - 91 * dayMs).toISOString();
+
+  const live = await isBetterAuthSessionActive(
+    makeClient({ data: { id: "session-1", expiresAt: future, createdAt: recent }, error: null }),
+    "user-1",
+    "session-1",
+  );
+  const capped = await isBetterAuthSessionActive(
+    makeClient({ data: { id: "session-1", expiresAt: future, createdAt: expiredByCap }, error: null }),
+    "user-1",
+    "session-1",
+  );
+  const nullCreated = await isBetterAuthSessionActive(
+    makeClient({ data: { id: "session-1", expiresAt: future, createdAt: null }, error: null }),
+    "user-1",
+    "session-1",
+  );
+  assertEquals(live, { active: true, relationMissing: false });
+  assertEquals(capped, { active: false, relationMissing: false });
+  assertEquals(nullCreated, { active: false, relationMissing: false });
+});
+
 Deno.test("listActiveBetterAuthSessionIds avoids a query when no registry ids exist", async () => {
   const result = await listActiveBetterAuthSessionIds(makeClient({}), "user-1", []);
   assert(result.sessionIds.size === 0, "expected no active ids");

@@ -1,5 +1,6 @@
 import { createAdapterFactory } from "better-auth/adapters";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { clampSessionRecordExpiresAt } from "./sessionLifetime.ts";
 
 type CleanWhere = {
   field: string;
@@ -91,16 +92,19 @@ export const supabaseBetterAuthAdapter = (client: SupabaseClient<any, any, any, 
     },
     adapter: () => ({
       create: async ({ model, data }) => {
-        const { data: row, error } = await client.schema("better_auth").from(model).insert(data as any).select().single();
+        const payload = model === "session"
+          ? clampSessionRecordExpiresAt(data as Record<string, unknown>)
+          : data;
+        const { data: row, error } = await client.schema("better_auth").from(model).insert(payload as any).select().single();
         fail(`create ${model}`, error);
-        return row as typeof data;
+        return (model === "session" && row ? clampSessionRecordExpiresAt(row) : row) as typeof data;
       },
       findOne: async ({ model, where }) => {
         let query = client.schema("better_auth").from(model).select("*").limit(1);
         query = applyWhere(query, where as CleanWhere[]);
         const { data, error } = await query.maybeSingle();
         fail(`findOne ${model}`, error);
-        return data;
+        return model === "session" && data ? clampSessionRecordExpiresAt(data) : data;
       },
       findMany: async ({ model, where, limit, offset, sortBy }) => {
         let query = client.schema("better_auth").from(model).select("*");
@@ -110,14 +114,15 @@ export const supabaseBetterAuthAdapter = (client: SupabaseClient<any, any, any, 
         else query = query.limit(limit);
         const { data, error } = await query;
         fail(`findMany ${model}`, error);
-        return data ?? [];
+        const rows = data ?? [];
+        return model === "session" ? rows.map((row) => clampSessionRecordExpiresAt(row)) : rows;
       },
       update: async ({ model, where, update }) => {
         let query = client.schema("better_auth").from(model).update(update as any).select().limit(1);
         query = applyWhere(query, where as CleanWhere[]);
         const { data, error } = await query.maybeSingle();
         fail(`update ${model}`, error);
-        return data;
+        return model === "session" && data ? clampSessionRecordExpiresAt(data) : data;
       },
       updateMany: async ({ model, where, update }) => {
         let query = client.schema("better_auth").from(model).update(update as any).select("id");

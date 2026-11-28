@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-// @ts-expect-error The generated JavaScript schemas are exercised at runtime.
+// @ts-expect-error edgeSchemas.mjs is untyped JavaScript source consumed by schema generators.
 import { generatedEdgeSchemas } from "./edgeSchemas.mjs";
 
 describe("edge device_id length bounds", () => {

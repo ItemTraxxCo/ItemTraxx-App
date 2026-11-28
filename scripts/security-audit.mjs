@@ -97,6 +97,11 @@ run(
   ["--test", join(scriptDirectory, "npm-audit-gate.test.mjs")],
 );
 run(
+  "testing .env.example contract",
+  runtime.nodePath,
+  ["--test", join(scriptDirectory, "env-example-contract.test.mjs")],
+);
+run(
   "npm audit (moderate+)",
   runtime.nodePath,
   [join(scriptDirectory, "npm-audit-gate.mjs")],

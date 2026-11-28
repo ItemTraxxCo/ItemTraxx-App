@@ -1,9 +1,12 @@
 import type { PostgrestErrorLike } from "./postgrestErrors.ts";
 import type { SupabaseClient } from "../admin-ops/context.ts";
 
+const SESSION_ABSOLUTE_MAX_AGE_MS = 90 * 24 * 60 * 60 * 1000;
+
 type BetterAuthSessionRow = {
   id: string;
   expiresAt: string | Date | null;
+  createdAt?: string | Date | null;
 };
 
 type BetterAuthSessionResult = {
@@ -25,8 +28,17 @@ const isMissingBetterAuthSessionRelation = (
 
 const isLiveSession = (row: BetterAuthSessionRow | null | undefined) => {
   if (!row?.id || !row.expiresAt) return false;
+  const now = Date.now();
   const expiresAt = new Date(row.expiresAt).getTime();
-  return Number.isFinite(expiresAt) && expiresAt > Date.now();
+  if (!Number.isFinite(expiresAt) || expiresAt <= now) return false;
+  if (row.createdAt !== undefined) {
+    if (!row.createdAt) return false;
+    const createdAt = new Date(row.createdAt).getTime();
+    if (!Number.isFinite(createdAt) || createdAt + SESSION_ABSOLUTE_MAX_AGE_MS <= now) {
+      return false;
+    }
+  }
+  return true;
 };
 
 /**
@@ -46,7 +58,7 @@ export const isBetterAuthSessionActive = async (
   const { data, error } = await client
     .schema("better_auth")
     .from("session")
-    .select('id, "expiresAt"')
+    .select('id, "expiresAt", "createdAt"')
     .eq("id", sessionId)
     .eq("userId", betterAuthUserId)
     .maybeSingle();
@@ -77,7 +89,7 @@ export const listActiveBetterAuthSessionIds = async (
   const { data, error } = await client
     .schema("better_auth")
     .from("session")
-    .select('id, "expiresAt"')
+    .select('id, "expiresAt", "createdAt"')
     .eq("userId", betterAuthUserId)
     .in("id", sessionIds)
     .gt("expiresAt", new Date().toISOString());

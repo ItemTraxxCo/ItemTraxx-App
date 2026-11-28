@@ -46,7 +46,7 @@ const tenantAdminLoginLocationSchema = z.enum([
 ]);
 
 const adminOpsDevicePayloadSchema = z.object({
-  device_id: z.string().min(1),
+  device_id: z.string().min(1).max(128),
   device_label: z.string().min(1),
   login_method: tenantAdminLoginMethodSchema.optional(),
   login_location: tenantAdminLoginLocationSchema.optional(),
@@ -104,7 +104,7 @@ const statusTrackedItemSchema = z.object({
 
 const tenantSessionSchema = z.object({
   id: z.string(),
-  device_id: z.string(),
+  device_id: z.string().max(128),
   device_label: z.string().nullable(),
   user_agent: z.string().nullable(),
   login_method: tenantAdminLoginMethodSchema.nullable(),
@@ -450,7 +450,7 @@ const superOpsLoginMethodSchema = z.enum(["password", "passkey"]);
 const superOpsLoginLocationSchema = z.enum(["super_auth", "super_settings"]);
 
 const superOpsDevicePayloadSchema = z.object({
-  device_id: z.string().min(1).optional(),
+  device_id: z.string().min(1).max(128).optional(),
   device_label: z.string().nullable().optional(),
   login_method: superOpsLoginMethodSchema.nullable().optional(),
   login_location: superOpsLoginLocationSchema.nullable().optional(),
@@ -458,7 +458,7 @@ const superOpsDevicePayloadSchema = z.object({
 
 const superOpsSessionSchema = z.object({
   id: z.string(),
-  device_id: z.string(),
+  device_id: z.string().max(128),
   device_label: z.string().nullable(),
   user_agent: z.string().nullable(),
   login_method: superOpsLoginMethodSchema.nullable(),
@@ -624,7 +624,7 @@ const superOpsRequestSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("verify_password"), payload: z.object({ password: z.string().min(1) }) }),
   z.object({
     action: z.literal("touch_session"),
-    payload: superOpsDevicePayloadSchema.extend({ device_id: z.string().min(1) }),
+    payload: superOpsDevicePayloadSchema.extend({ device_id: z.string().min(1).max(128) }),
   }),
   z.object({ action: z.literal("list_sessions"), payload: superOpsDevicePayloadSchema }),
   z.object({ action: z.literal("list_passkeys"), payload: z.object({}).optional() }),

@@ -40,5 +40,11 @@
       "binding": "KEYS",
       "id": "950e0d5b30d54475b0afbfcbc990c72b" // kv namespace for the keys
     }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "KMS_BACKUPS",
+      "bucket_name": "itemtraxx-kms-backups"
+    }
   ]
 }

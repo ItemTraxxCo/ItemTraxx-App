@@ -59,7 +59,7 @@ Current tokens: `EFFECTIVE_DATE`, `ENTITY_DESCRIPTION`, `MAILING_ADDRESS`, `GOVE
 ## 5. Status of unresolved items (checked 2026-11-04)
 
 - **Workspace deletion is not live in production.** The migrations `20261104120000`, `20261104130000`, and `20261104140000` are not applied to the production database, and the deployed `job-worker` predates them. The 30-day recovery and automated purge described in the Terms, DPA, Privacy Policy, and Student Data Addendum depend on both.
-- **Backup pruning is pending.** The backup workflow, script default, and README in `itemtraxx-backups` now say 30 days (checked 2026-11-04), but older releases are deleted only after the next backup run. Until then the 30-day statement is not yet true.
+- **Backup retention enforced in production (updated 2026-11-27).** Backups run directly on the dedicated Google Cloud VM (`us-west1-b`) with 7-day local encrypted buffer and off-box encrypted storage in Cloudflare R2 (`wnam`) under a 30-day bucket lifecycle expiration rule. Daily restore and RLS verification also runs on the VM. All legacy GitHub Releases and DB/passphrase secrets were purged from `ItemTraxxCo/itemtraxx-backups`; GitHub holds zero Customer Data or backup artifacts.
 - **Open tokens:** none. `OTHER_DATA_INCIDENT_NOTICE` is 72 hours and `ERROR_REPORT_RETENTION_DAYS` is 90.
 - **Error-report retention is not enforced in production.** No job deletes `client_error_reports` at 90 days; see the revision log.
 - **For counsel (wording is now conditional; review before publishing):** the "signed agreement, rider, or addendum" precedence level, the SOPIPA / Ed. Code 49073.1 "to the extent they apply" characterization, the Civil Code 1798.82 "outside limit" framing of the notice periods, DMCA agent registration, and the survival clause in Terms Section 14.
@@ -74,7 +74,7 @@ Current tokens: `EFFECTIVE_DATE`, `ENTITY_DESCRIPTION`, `MAILING_ADDRESS`, `GOVE
 | Offline conflicts resolve only on the creating account and device; Quick Return needs a Workspace Admin | `supabase/functions/offline-checkout/index.ts` |
 | Emails and incident alerts carry no borrower fields | `cloudflare/edge-proxy/src/{passwordResetDelivery,accountEmailDelivery,observability}.ts`, `supabase/functions/{job-worker,login-notify}/index.ts` |
 | Error reports store hashes of a network identifier; always on | `supabase/functions/client-error-report/index.ts`, `src/services/clientErrorReportService.ts` |
-| Production database region | Supabase project `us-west-1`; backup job VM zone `us-west1-b`; encrypted backups stored as GitHub release assets (`itemtraxx-backups` repository) |
+| Production database and backup regions | Supabase project `us-west-1`; backup and restore-verification VM zone `us-west1-b`; encrypted backups stored in Cloudflare R2 (`wnam`, 30-day lifecycle expiration); GitHub holds zero Customer Data or backup artifacts |
 | No AI or machine-learning provider receives Customer Data | No such integration in `src`, `supabase/functions`, or `cloudflare/edge-proxy/src` |
 | Consent cookie names, 1-year duration, cross-tab sync | `src/services/cookieConsentService.ts` |
 | Analytics and diagnostics opt-in; replay needs both | `src/services/cookieConsentService.ts`, `src/services/posthogService.ts` |

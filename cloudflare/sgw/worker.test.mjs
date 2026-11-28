@@ -312,3 +312,93 @@ test('JIT gateway routes enforce signed ticket, expiry at T+1s, workspace bindin
   const bgEncrypt = await handleRequest(jitReq('/v1/crypto/jit/encrypt', { workspace_id: workspace, id, payload: { first_name: 'Emergency', borrower_id: 'BG1' }, index_fields: { borrower_id: 'BG1' } }, breakGlassToken), jitEnv, async () => true, async () => true, (iat + 10) * 1000);
   assert.equal(bgEncrypt.status, 200);
 });
+
+test('isolated R2 KMS backup mirrors wrapped keys on provision and shreds them with tombstone on revoke (ITX-103)', async () => {
+  const kv = new Map();
+  const r2 = new Map();
+  let state;
+  const coordinator = async (action) => {
+    if (action === 'claim_provision' && !state) { state = 'provisioning'; return true; }
+    if (action === 'finish_provision' && state === 'provisioning') { state = 'active'; return true; }
+    if (action === 'is_active') return state === 'active';
+    if (action === 'claim_revoke' && state === 'active') { state = 'revoking'; return true; }
+    if (action === 'is_revoking') return state === 'revoking';
+    if (action === 'is_revoked') return state === 'revoked';
+    if (action === 'finish_revoke' && state === 'revoking') { state = 'revoked'; return true; }
+    return false;
+  };
+  const r2Binding = {
+    head: async (k) => (r2.has(k) ? { key: k } : null),
+    put: async (k, v) => { r2.set(k, v); },
+    delete: async (k) => { r2.delete(k); },
+  };
+  const custom = {
+    ...env,
+    SGW_REQUIRE_KMS_BACKUP: 'true',
+    KEYS: { get: async (k) => kv.get(k) ?? null, put: async (k, v) => { kv.set(k, v); }, delete: async (k) => { kv.delete(k); } },
+    KMS_BACKUPS: r2Binding,
+  };
+
+  // Provision writes wrapped key to both KV and isolated R2 bucket
+  const prov = await handleRequest(request('/v1/kms/generate-tenant-keys', { workspace_id: workspace }, env.KMS_LIFECYCLE_SECRET), custom, coordinator, undefined, 1_700_000_000_000);
+  assert.equal(prov.status, 200);
+  assert.equal(state, 'active');
+  const backupKey = `kms/v1/${workspace}.json`;
+  const tombstoneKey = `kms/revoked/${workspace}.json`;
+  assert.equal(r2.get(backupKey), kv.get(workspace));
+  assert.equal(r2.has(tombstoneKey), false);
+  // Confirm wrapped key backup never exposes MASTER_KEK
+  assert.equal(r2.get(backupKey).includes(env.MASTER_KEK), false);
+
+  // Encrypt works while active
+  const encRes = await handleRequest(request('/v1/crypto/encrypt', { workspace_id: workspace, id, payload: { name: 'Student A' } }, env.KMS_INTERNAL_SECRET), custom, coordinator);
+  assert.equal(encRes.status, 200);
+  const encrypted = await encRes.json();
+
+  // Revoke shreds key from BOTH KV and isolated R2 backup and writes tombstone
+  const rev = await handleRequest(request('/v1/kms/revoke-tenant-keys', { workspace_id: workspace }, env.KMS_LIFECYCLE_SECRET), custom, coordinator, undefined, 1_700_000_060_000);
+  assert.equal(rev.status, 200);
+  assert.equal(state, 'revoked');
+  assert.equal(kv.has(workspace), false);
+  assert.equal(r2.has(backupKey), false);
+  assert.equal(r2.has(tombstoneKey), true);
+  assert.equal(JSON.parse(r2.get(tombstoneKey)).status, 'revoked');
+
+  // Decryption fails closed after shredding
+  const decRes = await handleRequest(request('/v1/crypto/decrypt', { workspace_id: workspace, items: [{ id, ...encrypted }] }, env.KMS_INTERNAL_SECRET), custom, coordinator);
+  assert.equal(decRes.status, 404);
+
+  // Even if DB lifecycle state were rolled back from an old snapshot, tombstone blocks reprovisioning
+  state = undefined;
+  const reprov = await handleRequest(request('/v1/kms/generate-tenant-keys', { workspace_id: workspace }, env.KMS_LIFECYCLE_SECRET), custom, coordinator);
+  assert.equal(reprov.status, 409);
+  assert.equal(kv.has(workspace), false);
+  assert.equal(r2.has(backupKey), false);
+});
+
+test('SGW_REQUIRE_KMS_BACKUP=true fails closed when KMS_BACKUPS binding is missing', async () => {
+  const custom = { ...env, SGW_REQUIRE_KMS_BACKUP: 'true', KEYS: { get: async () => null, put: async () => {}, delete: async () => {} } };
+  const prov = await handleRequest(request('/v1/kms/generate-tenant-keys', { workspace_id: workspace }, env.KMS_LIFECYCLE_SECRET), custom, async () => true);
+  assert.equal(prov.status, 503);
+  const rev = await handleRequest(request('/v1/kms/revoke-tenant-keys', { workspace_id: workspace }, env.KMS_LIFECYCLE_SECRET), custom, async () => true);
+  assert.equal(rev.status, 503);
+});
+
+test('failed R2 backup write during provisioning leaves workspace in provisioning state', async () => {
+  let state;
+  const kv = new Map();
+  const coordinator = async (action) => {
+    if (action === 'claim_provision' && !state) { state = 'provisioning'; return true; }
+    if (action === 'finish_provision' && state === 'provisioning') { state = 'active'; return true; }
+    return false;
+  };
+  const custom = {
+    ...env,
+    SGW_REQUIRE_KMS_BACKUP: 'true',
+    KEYS: { get: async (k) => kv.get(k) ?? null, put: async (k, v) => { kv.set(k, v); } },
+    KMS_BACKUPS: { head: async () => null, put: async () => { throw new Error('r2 down'); } },
+  };
+  const prov = await handleRequest(request('/v1/kms/generate-tenant-keys', { workspace_id: workspace }, env.KMS_LIFECYCLE_SECRET), custom, coordinator);
+  assert.equal(prov.status, 503);
+  assert.equal(state, 'provisioning');
+});
